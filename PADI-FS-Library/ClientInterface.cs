@@ -15,6 +15,7 @@ namespace PADI_FS_Library
 
         string read(int fileRegister, string semantics, int stringRegister);
         void write(int fileRegister, string contentToWrite);
+        void write(int fileRegister, int stringRegister);
 
         string dump();
 

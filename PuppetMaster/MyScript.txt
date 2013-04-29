@@ -7,7 +7,10 @@ READ c-1, 0, monotonic, 0
 DUMP d-1
 DUMP d-2
 WRITE c-1, 0, "TEXTO TEXTO TEXTO"
-DUMP d-1
-DUMP d-2
+CREATE c-1, f2, 2, 1, 1
+OPEN c-1, f2
+READ c-1, 0, monotonic, 0
+WRITE c-1, 1, 0
+READ c-1, 1, monotonic, 1
 READ c-1, 0, monotonic, 0
 #End of Script

@@ -259,8 +259,7 @@ namespace PuppetMaster
 
             //WRITE COMMAND - (ONLY TO CLIENTS) 
             if (commandType.ToUpper() == "WRITE")
-            {
-                textToWrite = command.Split('\"')[1];
+            {                
                 //if its a client 
                 if (commandProcess[0] == 'c')
                 {
@@ -283,7 +282,12 @@ namespace PuppetMaster
                     }
 
                     //call to the client for file writing
-                    clients[commandProcess].Item2.write(Convert.ToInt32(commandWords[2]), textToWrite);
+                    if (command.Contains('\"'))
+                    {
+                        textToWrite = command.Split('\"')[1];
+                        clients[commandProcess].Item2.write(Convert.ToInt32(commandWords[2]), textToWrite);
+                    } else
+                        clients[commandProcess].Item2.write(Convert.ToInt32(commandWords[2]), Convert.ToInt32(commandWords[3]));
 
                     LogPrint("Writing of file register " + commandWords[2] + " of client " + commandProcess + " sucessful!");
                 }

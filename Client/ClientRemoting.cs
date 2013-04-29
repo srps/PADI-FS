@@ -42,11 +42,9 @@ namespace Client
         //MetadataServers Proxys
         Dictionary<string, MetadataServerInterface> _metadataServersProxys;
         //Arrays with 10 positions for storing file Metadata being used
-        FileMetadata[] _filesMetadata;
+        Tuple<FileMetadata, PADI_FS_Library.File>[] _filesInfo;
         //Arrays with 10 positions for storing files (contents) being used...
-        PADI_FS_Library.File[] _filesContents;
-        //...and respective file metadata position in _filesMetadata array -> ???
-        int[] _posOfFilesContentInFilesMetadata;
+        String[] _stringRegister;
         
         public ClientRemoting(string clientName, int clientPort)
         {
@@ -55,17 +53,16 @@ namespace Client
             _clientPort = clientPort;
 
             _metadataServersProxys = new Dictionary<string, MetadataServerInterface>();
-            _filesMetadata = new FileMetadata[numberOfRegisters];
-            _filesContents = new PADI_FS_Library.File[numberOfRegisters];
-            _posOfFilesContentInFilesMetadata = new int[numberOfRegisters];
+            _filesInfo = new Tuple<FileMetadata, PADI_FS_Library.File>[numberOfRegisters];
+            _stringRegister = new String[numberOfRegisters];
             for (int i = 0; i < numberOfRegisters; i++)
             {
-                _filesMetadata[i] = null;
-                _filesContents[i] = null;
+                _filesInfo[i] = null;
+                _stringRegister[i] = "";
             }
 
             //Populate Metadata Servers Proxys
-            TextReader metadataServersPorts = new StreamReader("..\\..\\..\\Client\\bin\\Debug\\MetadataServersPorts.txt");
+            TextReader metadataServersPorts = new StreamReader(@"..\..\..\Client\bin\Debug\MetadataServersPorts.txt");
             string metadataServersPortsLine;
             string[] metadataServersPortsLineWords;
             while ((metadataServersPortsLine = metadataServersPorts.ReadLine()) != null)
@@ -93,7 +90,7 @@ namespace Client
 
         private void saveFileMetadata(FileMetadata fileMetadata)
         {
-            _filesMetadata[_registerPosition] = fileMetadata;
+            _filesInfo[_registerPosition] = new Tuple<FileMetadata,PADI_FS_Library.File>(fileMetadata,null);
 
             if (++_registerPosition == numberOfRegisters)
                 _registerPosition = 0;
@@ -258,13 +255,14 @@ namespace Client
             LogPrint("Read Operation");
             LogPrint("\tFile Register: " + fileRegister + " Semantics: " + semantics + " String Register: " + stringRegister);
 
-            FileMetadata fileMetadataToRead = _filesMetadata[fileRegister];
+            FileMetadata fileMetadataToRead;
 
             //if the file register to read is null (that is, if that file does not exists in the client) sends an exception
-            if(fileMetadataToRead == null)
+            if (_filesInfo[fileRegister] != null)
             {
-                //TODO
+                fileMetadataToRead = _filesInfo[fileRegister].Item1;
             }
+            else throw new Exception("Registo na posicao " + fileRegister + " nao existe");
 
             //Call every Data Server that contains the file
             foreach(Tuple<string, string> fileDataServerLocation in fileMetadataToRead.FileDataServersLocations)
@@ -309,26 +307,20 @@ namespace Client
             //fileToSave = null problem (maybe because someone deleted the file in the exact moment this client was going to read it, etc)
             if (fileToSave == null)
             {
-                if (_filesContents[stringRegister] == null)
-                {
                     return "File Doesnt Exist"; // MUDAR PARA EXCEPCAO???
-                }
             }
             else
             {
                 //Array registers update
-                if (_filesContents[stringRegister] == null || _filesContents[stringRegister].VersionNumber <= fileToSave.VersionNumber)
-                    _filesContents[stringRegister] = fileToSave;
-
+                if (_filesInfo[fileRegister].Item2 == null || fileToSave.VersionNumber >= _filesInfo[fileRegister].Item2.VersionNumber)
+                    _filesInfo[fileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(_filesInfo[fileRegister].Item1, fileToSave);
+                _stringRegister[stringRegister] = fileToSave.FileContents;
             }
 
-            //Association between position of string register and file metadata register update -> ???
-            _posOfFilesContentInFilesMetadata[stringRegister] = fileRegister;
-
-            LogPrint("File Read Contents: " + _filesContents[stringRegister].FileContents);
+            LogPrint("File Read Contents: " + _stringRegister[stringRegister]);
             LogPrint("Sucessful!");
 
-            return _filesContents[stringRegister].FileContents;
+            return _stringRegister[stringRegister];
         }
 
         //Write Operation
@@ -340,22 +332,16 @@ namespace Client
             LogPrint("Write Operation");
             LogPrint("\tFile Register: " + fileRegister + " Contents: " + contentToWrite);
 
-            PADI_FS_Library.File fileToWrite = _filesContents[fileRegister];
+            PADI_FS_Library.File fileToWrite = _filesInfo[fileRegister].Item2;
 
             //if the file register to write is null (that is, if that file does not exists in the client) then
             //the version number used to write will be 0, otherwise it will be the version number of the existing file plus one
-            int versionNumberToWrite;
+            int versionNumberToWrite = 1;
             FileMetadata fileMetadataToWrite;
-            if (fileToWrite == null)
-            {
-                versionNumberToWrite = 0;
-                fileMetadataToWrite = _filesMetadata[fileRegister];
-            }
-            else
-            {
+            if (fileToWrite != null)
                 versionNumberToWrite = fileToWrite.VersionNumber + 1;
-                fileMetadataToWrite = _filesMetadata[_posOfFilesContentInFilesMetadata[fileRegister]];
-            }
+            fileMetadataToWrite = _filesInfo[fileRegister].Item1;
+                
             
             //LogPrint("---------VERSION TO WRITE: " + versionNumberToWrite);
             //LogPrint("---------POSITION IN FILES CONTENTS FILES META: " + _posOfFilesContentInFilesMetadata[fileRegister]);
@@ -389,10 +375,88 @@ namespace Client
 
             //Updates local registers (not really necessary because before any write the client has to make a read)
             //Info: They arent updated if file didnt exist before
-            if (fileToWrite != null)
+            if (fileToWrite == null)
             {
-                _filesContents[fileRegister].VersionNumber = versionNumberToWrite;
-                _filesContents[fileRegister].FileContents = contentToWrite;
+                PADI_FS_Library.File newFile = new PADI_FS_Library.File(fileMetadataToWrite.Filename, contentToWrite, versionNumberToWrite);
+                _filesInfo[fileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(fileMetadataToWrite, newFile);
+            }
+            else
+            {
+                _filesInfo[fileRegister].Item2.VersionNumber = versionNumberToWrite;
+                _filesInfo[fileRegister].Item2.FileContents = contentToWrite;
+            }
+
+
+            LogPrint("Sucessful!");
+
+            return;
+        }
+
+        
+        public void write(int fileRegister, int regPosition)
+        {
+            //Write variables restore
+            _writeResponses = 0;
+
+            LogPrint("Write Operation");
+            LogPrint("\tFile Register: " + fileRegister + " String Register: " + regPosition);
+
+            if(_filesInfo[fileRegister] == null)
+                throw new Exception("Ficheiro nao existe!");
+
+            PADI_FS_Library.File fileToWrite = _filesInfo[fileRegister].Item2;
+            String contentToWrite = _stringRegister[regPosition];
+
+            //if the file register to write is null (that is, if that file does not exists in the client) then
+            //the version number used to write will be 0, otherwise it will be the version number of the existing file plus one
+            int versionNumberToWrite = 1;
+            FileMetadata fileMetadataToWrite;
+            if (fileToWrite != null) {
+                versionNumberToWrite = fileToWrite.VersionNumber + 1;
+            }
+            fileMetadataToWrite = _filesInfo[fileRegister].Item1;
+
+            //LogPrint("---------VERSION TO WRITE: " + versionNumberToWrite);
+            //LogPrint("---------POSITION IN FILES CONTENTS FILES META: " + _posOfFilesContentInFilesMetadata[fileRegister]);
+
+
+            //Call every Data Server that contains the file
+            foreach (Tuple<string, string> fileDataServerLocation in fileMetadataToWrite.FileDataServersLocations)
+            {
+                DataServerInterface dataServerProxy = (DataServerInterface)Activator.GetObject(
+                                                        typeof(DataServerInterface),
+                                                        fileDataServerLocation.Item1);
+
+                // Alternative 2: asynchronous call with callback
+                // Create delegate to remote method
+                RemoteAsyncWriteFileDelegate RemoteDel = new RemoteAsyncWriteFileDelegate(dataServerProxy.write);
+                // Create delegate to local callback
+                AsyncCallback RemoteCallback = new AsyncCallback(this.WriteFileRemoteAsyncCallBack);
+                // Call remote method
+                IAsyncResult RemAr = RemoteDel.BeginInvoke(fileDataServerLocation.Item2, versionNumberToWrite, contentToWrite, RemoteCallback, null);
+            }
+
+            //LogPrint("WRITE RESPONSES: " + _writeResponses);
+            //LogPrint("WRITE QUORUM: " + fileMetadataToWrite.WriteQuorum);
+
+            //Waits for a quorum of Write Responses
+            while (_writeResponses < fileMetadataToWrite.WriteQuorum) //ESTA A HAVER PROBLEMAS AQUI ???
+            {
+                continue;
+            }
+
+
+            //Updates local registers (not really necessary because before any write the client has to make a read)
+            //Info: They arent updated if file didnt exist before
+            if (fileToWrite == null)
+            {
+                PADI_FS_Library.File newFile = new PADI_FS_Library.File(fileMetadataToWrite.Filename, contentToWrite, versionNumberToWrite);
+                _filesInfo[fileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(fileMetadataToWrite, newFile);
+            }
+            else
+            {
+                _filesInfo[fileRegister].Item2.VersionNumber = versionNumberToWrite;
+                _filesInfo[fileRegister].Item2.FileContents = contentToWrite;
             }
 
             LogPrint("Sucessful!");
@@ -409,25 +473,32 @@ namespace Client
 
             LogPrint("Array File Metadata Registers");
             toReturn += "Array File Metadata Registers" + "\r\n";
-            foreach (FileMetadata fileMetadata in _filesMetadata)
+            foreach (Tuple<FileMetadata, PADI_FS_Library.File> fileInfo in _filesInfo)
             {
-                if (fileMetadata != null)
+                FileMetadata meta = fileInfo.Item1;
+                PADI_FS_Library.File file = fileInfo.Item2;
+                if (meta != null)
                 {
-                    string fileMetadataToString = fileMetadata.ToString();
+                    string fileMetadataToString = meta.ToString();
                     LogPrint(fileMetadataToString);
                     toReturn += fileMetadataToString + "\r\n";
-                }                
+                } 
+                if (file != null)
+                {
+                    string fileToString = file.ToString();
+                    LogPrint(fileToString);
+                    toReturn += fileToString + "\r\n";
+                }
             }
 
             LogPrint("Array File Contents Registers");
             toReturn += "Array File Contents Registers" + "\r\n";
-            foreach (PADI_FS_Library.File file in _filesContents)
+            foreach (String reg in _stringRegister)
             {
-                if (file != null)
+                if (reg != null)
                 {
-                    string fileContentsToString = file.ToString();
-                    LogPrint(fileContentsToString);
-                    toReturn += fileContentsToString + "\r\n";
+                    LogPrint(reg);
+                    toReturn += reg + "\r\n";
                 }
             }
 
