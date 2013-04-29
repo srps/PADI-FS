@@ -24,6 +24,10 @@ using PADI_FS_Library;
 
 namespace PuppetMaster
 {
+    /// <summary>
+    /// Puppet Master Class
+    /// </summary>
+
     public partial class PuppetMasterForm : Form
     {
         //Puppet Master channel for components connections
