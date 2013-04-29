@@ -210,6 +210,16 @@ namespace Client
                 try
                 {
                     _metadataServersProxys[metadataServerName].close(filename);
+
+                    for (int i = 0; i < numberOfRegisters; i++)
+                    {
+                        if (_filesMetadata[i].Filename == filename)
+                        {
+                            _filesMetadata[i] = null;
+                            break;
+                        }
+                    }
+
                     break;
                 }
                 catch (Exception)
@@ -234,6 +244,15 @@ namespace Client
                 try
                 {
                     _metadataServersProxys[metadataServerName].delete(filename);
+
+                    for (int i = 0; i < numberOfRegisters; i++)
+                    {
+                        if (_filesMetadata[i].Filename == filename)
+                        {
+                            _filesMetadata[i] = null;
+                        }
+                    }
+
                     break;
                 }
                 catch (Exception)
