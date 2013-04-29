@@ -210,9 +210,9 @@ namespace Client
 
                     for (int i = 0; i < numberOfRegisters; i++)
                     {
-                        if (_filesMetadata[i].Filename == filename)
+                        if (_filesInfo[i].Item1.Filename == filename)
                         {
-                            _filesMetadata[i] = null;
+                            _filesInfo[i] = null;
                             break;
                         }
                     }
@@ -244,9 +244,9 @@ namespace Client
 
                     for (int i = 0; i < numberOfRegisters; i++)
                     {
-                        if (_filesMetadata[i].Filename == filename)
+                        if (_filesInfo[i].Item1.Filename == filename)
                         {
-                            _filesMetadata[i] = null;
+                            _filesInfo[i] = null;
                         }
                     }
 
