@@ -337,7 +337,7 @@ namespace PuppetMaster
                         salt = command.Split('\"')[1];
                     }
                     
-                    clients[commandProcess].Item2.copy(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]), salt);
+                    clients[commandProcess].Item2.copy(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]), System.Text.Encoding.UTF8.GetBytes(salt));
 
                     LogPrint("Copy of file register " + commandWords[2] + " with string " + salt + " to file register " + commandWords[4] + " of client " + commandProcess + " sucessful!");
                 }

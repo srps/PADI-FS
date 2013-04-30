@@ -514,9 +514,10 @@ namespace Client
         // Copy Operation
         public string copy(int sourceFileRegister, string semantics, int destinFileRegister, byte[] salt)
         {
+            string saltString = System.Text.Encoding.Default.GetString(salt);
             LogPrint("Copy Operation");
             LogPrint("\t Source File Register: " + sourceFileRegister + "Destination File Register: " + destinFileRegister +
-                "Using Semantics: " + semantics + "Salt: " + salt);
+                "Using Semantics: " + semantics + "Salt: " + saltString);
 
             //Read variables restore
             _readResponses = 0;
@@ -611,7 +612,7 @@ namespace Client
             if (!_success)
                 return ("Unable to fetch a recent version. Aborting");
 
-            contentToWrite = fileToSave.FileContents + salt;
+            contentToWrite = fileToSave.FileContents + saltString;
 
             //Write variables restore
             _writeResponses = 0;
