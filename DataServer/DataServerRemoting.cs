@@ -11,10 +11,11 @@ namespace DataServer
 {
     public class DataServerRemoting : MarshalByRefObject, DataServerInterface
     {
-        //DataServer Properties
+        // DataServer Properties
         string _dataServerName;
         int _dataServerPort;
 
+        // For PuppetMaster ops
         bool _isInFreezeMode;
         bool _isInFailMode;
 
@@ -23,7 +24,7 @@ namespace DataServer
 
         public DataServerRemoting(string dataServerName, int dataServerPort)
         {
-            //Inicializations
+            // Inicializations
             _dataServerName = dataServerName;
             _dataServerPort = dataServerPort;
 
@@ -41,9 +42,9 @@ namespace DataServer
         }
 
 
-        //Main Operations
+        // Main Operations
 
-        //Read Operation
+        // Read Operation
         public File read(string filename, string semantics) //semantics ... QUAL O USO DISTO????
         {
 

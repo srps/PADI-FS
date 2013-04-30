@@ -330,10 +330,22 @@ namespace Client
             }
             else
             {
-                //Array registers update
-                if (_filesInfo[fileRegister].Item2 == null || fileToSave.VersionNumber >= _filesInfo[fileRegister].Item2.VersionNumber)
+                //Array registers update - monotonic and default
+                if (semantics.Equals("monotonic"))
+                {
+                    if (_filesInfo[fileRegister].Item2 == null || fileToSave.VersionNumber >= _filesInfo[fileRegister].Item2.VersionNumber)
+                    {
+                        _filesInfo[fileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(_filesInfo[fileRegister].Item1, fileToSave);
+                        _stringRegister[stringRegister] = fileToSave.FileContents;
+                    }
+                }
+                else if (semantics.Equals("default"))
+                {
                     _filesInfo[fileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(_filesInfo[fileRegister].Item1, fileToSave);
-                _stringRegister[stringRegister] = fileToSave.FileContents;
+                    _stringRegister[stringRegister] = fileToSave.FileContents;
+                }
+                else throw new Exception("Unknown Semantics");
+
             }
 
             LogPrint("File Read Contents: " + _stringRegister[stringRegister]);

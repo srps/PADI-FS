@@ -19,7 +19,7 @@ namespace DataServer
         static void Main(string[] args)
         {
 
-            Console.BackgroundColor = ConsoleColor.DarkGray;
+            Console.BackgroundColor = ConsoleColor.DarkMagenta;
             Console.Clear();
 
             string dataServerName = args[0];
@@ -40,7 +40,7 @@ namespace DataServer
             
             //Registo do DataServer nos MetadataServers (basta enviar a um, ele expande o registo)
             Dictionary<string, MetadataServerInterface> metadataServersProxys = new Dictionary<string,MetadataServerInterface>();
-            TextReader metadataServersPorts = new StreamReader("..\\..\\..\\DataServer\\bin\\Debug\\MetadataServersPorts.txt");
+            TextReader metadataServersPorts = new StreamReader(@"..\..\..\DataServer\bin\Debug\MetadataServersPorts.txt");
             string metadataServersPortsLine;
             string[] metadataServersPortsLineWords;
             while ((metadataServersPortsLine = metadataServersPorts.ReadLine()) != null)
