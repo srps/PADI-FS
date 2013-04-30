@@ -495,6 +495,12 @@ namespace Client
             return;
         }
 
+
+        //Copy Operation
+        public void copy(int fileRegister1, string semantics, int fileRegister2, string salt)
+        {
+        }
+
         //Dump Operation
         public string dump()
         {

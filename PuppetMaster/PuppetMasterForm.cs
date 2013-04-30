@@ -127,6 +127,8 @@ namespace PuppetMaster
                    LogPrint(fileMetadata.ToString());
 
                 }
+
+                return;
             }
 
 
@@ -159,6 +161,8 @@ namespace PuppetMaster
 
                     LogPrint(fileMetadata.ToString());
                 }
+
+                return;
             }
 
             //CLOSE COMMAND - (ONLY TO CLIENTS) 
@@ -190,6 +194,8 @@ namespace PuppetMaster
 
                     LogPrint("Closing of file " + commandWords[2] + " by client " + commandProcess + " sucessful!");
                 }
+
+                return;
             }
 
             //DELETE COMMAND - (ONLY TO CLIENTS) 
@@ -221,6 +227,8 @@ namespace PuppetMaster
 
                     LogPrint("Deleting of file " + commandWords[2] + " by client " + commandProcess + " sucessful!");
                 }
+
+                return;
             }
 
             //READ COMMAND - (ONLY TO CLIENTS) 
@@ -254,6 +262,8 @@ namespace PuppetMaster
 
                     LogPrint("Reading of file register " + commandWords[2] + " of client " + commandProcess + " sucessful!");
                 }
+
+                return;
             }
 
 
@@ -291,6 +301,8 @@ namespace PuppetMaster
 
                     LogPrint("Writing of file register " + commandWords[2] + " of client " + commandProcess + " sucessful!");
                 }
+
+                return;
             }
 
 
@@ -329,6 +341,8 @@ namespace PuppetMaster
 
                     LogPrint("Copy of file register " + commandWords[2] + " with string " + salt + " to file register " + commandWords[4] + " of client " + commandProcess + " sucessful!");
                 }
+
+                return;
             }
 
 
@@ -369,6 +383,8 @@ namespace PuppetMaster
 
 
                         }
+
+                return;
             }
 
             //UNFREEZE COMMAND - (ONLY TO DATASERVERS)
@@ -401,6 +417,8 @@ namespace PuppetMaster
 
                     LogPrint("Unfreeze of " + commandProcess + " successful!");
                 }
+
+                return;
             }
 
             //DUMP COMMAND 
@@ -498,7 +516,11 @@ namespace PuppetMaster
 
                     LogPrint("Dump of " + commandProcess + " successful!");
                 }
+
+                return;
             }
+
+            LogPrint("COMMAND NOT RECOGNISED - TRY ANOTHER COMMAND");
 
         }
 
@@ -595,7 +617,11 @@ namespace PuppetMaster
         //Executes one command previously entered in the run_command_TextBox
         private void run_command_Click(object sender, EventArgs e)
         {
+            LogPrint("Command to RUN:" + command_TextBox.Text);
+            runCommand(command_TextBox.Text);
+            LogPrint("----------------------------------------------");
 
+            command_TextBox.Text = "";
         }
 
         
