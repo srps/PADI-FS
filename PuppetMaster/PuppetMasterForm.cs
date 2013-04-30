@@ -294,6 +294,44 @@ namespace PuppetMaster
             }
 
 
+            //WRITE COMMAND - (ONLY TO CLIENTS) 
+            if (commandType.ToUpper() == "COPY")
+            {
+                //if its a client 
+                if (commandProcess[0] == 'c')
+                {
+                    //if that client doesnt exist in puppet master "database" we have to create it
+                    if (!clients.ContainsKey(commandProcess))
+                    {
+                        string[] clientInfo = commandProcess.Split('-');
+                        int clientPort = clientStartPort + Convert.ToInt32(clientInfo[1]);
+
+                        //Creation of process client
+                        Process.Start(@"..\..\..\Client\bin\Debug\Client.exe", commandProcess + " " + clientPort);
+
+                        //Saving client stuff in puppet master
+                        string newCLientURL = "tcp://localhost:" + clientPort + "/" + commandProcess;
+                        ClientInterface clientProxy = (ClientInterface)Activator.GetObject(
+                                                        typeof(ClientInterface),
+                                                        newCLientURL);
+
+                        clients.Add(commandProcess, new Tuple<string, ClientInterface>(newCLientURL, clientProxy));
+                    }
+
+                    //call to the client for file copying
+                    string salt = "";
+                    if (command.Contains('\"'))
+                    {
+                        salt = command.Split('\"')[1];
+                    }
+                    
+                    clients[commandProcess].Item2.copy(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]), salt);
+
+                    LogPrint("Copy of file register " + commandWords[2] + " with string " + salt + " to file register " + commandWords[4] + " of client " + commandProcess + " sucessful!");
+                }
+            }
+
+
 
             //RECOVER COMMAND - METADATASERVERS AND DATASERVERS
             if (commandType.ToUpper() == "RECOVER")
