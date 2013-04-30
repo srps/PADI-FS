@@ -487,7 +487,37 @@ namespace PuppetMaster
 
         private void run_script_Click(object sender, EventArgs e)
         {
+            String command = null;
 
+            //Script wasnt loaded yet
+            if (script == null)
+            {
+                LogPrint("Please, load the script first");
+                return;
+            }
+
+            //Check if its not end of script
+            while ((command = script.ReadLine()) != null)
+            {
+                //If its a comment, ignore
+                if (command[0] == '#')
+                    continue;
+
+                //Run command
+                LogPrint("Command to RUN:" + command);
+
+                runCommand(command);
+
+                LogPrint("----------------------------------------------");
+
+                
+            }
+
+            //End of script (close script)
+            script.Close();
+            script = null;
+
+            return;
         }
 
         //Executes next step in the script previously loaded (any comment line is ignored)
@@ -520,6 +550,8 @@ namespace PuppetMaster
             LogPrint("Command to RUN:" + command);
 
             runCommand(command);
+           
+            LogPrint("----------------------------------------------");
         }
 
         //Executes one command previously entered in the run_command_TextBox
