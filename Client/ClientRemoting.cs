@@ -270,6 +270,10 @@ namespace Client
             _readResponses = 0;
             _readFilesResponses = new List<PADI_FS_Library.File>();
 
+            // Variables for retry (monotonic)
+            Boolean _success = false;
+            int _retry = 3;
+
 
             LogPrint("Read Operation");
             LogPrint("\tFile Register: " + fileRegister + " Semantics: " + semantics + " String Register: " + stringRegister);
@@ -283,70 +287,82 @@ namespace Client
             }
             else throw new Exception("Registo na posicao " + fileRegister + " nao existe");
 
-            //Call every Data Server that contains the file
-            foreach(Tuple<string, string> fileDataServerLocation in fileMetadataToRead.FileDataServersLocations)
+            while (_retry > 0)
             {
-                DataServerInterface dataServerProxy = (DataServerInterface)Activator.GetObject(
-                                                        typeof(DataServerInterface),
-                                                        fileDataServerLocation.Item1);
-
-                // Alternative 2: asynchronous call with callback
-                // Create delegate to remote method
-                RemoteAsyncGetFileDelegate RemoteDel = new RemoteAsyncGetFileDelegate(dataServerProxy.read);
-                // Create delegate to local callback
-                AsyncCallback RemoteCallback = new AsyncCallback(this.GetFileRemoteAsyncCallBack);
-                // Call remote method
-                IAsyncResult RemAr = RemoteDel.BeginInvoke(fileDataServerLocation.Item2, semantics, RemoteCallback, null);
-            }
-
-            //Waits for a quorum of Read Responses
-            while (_readResponses < fileMetadataToRead.ReadQuorum)
-            {
-                continue;
-            }
-
-            //After getting a quorum decides what to save (the most recent version of the files obtained)
-            int counter = 0;
-            int version = -1;
-            PADI_FS_Library.File fileToSave = null;
-            foreach (PADI_FS_Library.File fileRead in _readFilesResponses)
-            {
-                if (counter == fileMetadataToRead.ReadQuorum)
-                    break;
-
-                if (fileRead.VersionNumber >= version) //MAIOR APENAS OU MAIOR OU IGUAL ???
+                //Call every Data Server that contains the file
+                foreach (Tuple<string, string> fileDataServerLocation in fileMetadataToRead.FileDataServersLocations)
                 {
-                    version = fileRead.VersionNumber;
-                    fileToSave = fileRead;
+                    DataServerInterface dataServerProxy = (DataServerInterface)Activator.GetObject(
+                                                            typeof(DataServerInterface),
+                                                            fileDataServerLocation.Item1);
+
+                    // Alternative 2: asynchronous call with callback
+                    // Create delegate to remote method
+                    RemoteAsyncGetFileDelegate RemoteDel = new RemoteAsyncGetFileDelegate(dataServerProxy.read);
+                    // Create delegate to local callback
+                    AsyncCallback RemoteCallback = new AsyncCallback(this.GetFileRemoteAsyncCallBack);
+                    // Call remote method
+                    IAsyncResult RemAr = RemoteDel.BeginInvoke(fileDataServerLocation.Item2, semantics, RemoteCallback, null);
                 }
 
-                counter++;
-            }
-
-            //fileToSave = null problem (maybe because someone deleted the file in the exact moment this client was going to read it, etc)
-            if (fileToSave == null)
-            {
-                    return "File Doesnt Exist"; // MUDAR PARA EXCEPCAO???
-            }
-            else
-            {
-                //Array registers update - monotonic and default
-                if (semantics.Equals("monotonic"))
+                //Waits for a quorum of Read Responses
+                while (_readResponses < fileMetadataToRead.ReadQuorum)
                 {
-                    if (_filesInfo[fileRegister].Item2 == null || fileToSave.VersionNumber >= _filesInfo[fileRegister].Item2.VersionNumber)
+                    continue;
+                }
+
+                //After getting a quorum decides what to save (the most recent version of the files obtained)
+                int counter = 0;
+                int version = -1;
+                PADI_FS_Library.File fileToSave = null;
+                foreach (PADI_FS_Library.File fileRead in _readFilesResponses)
+                {
+                    if (counter == fileMetadataToRead.ReadQuorum)
+                        break;
+
+                    if (fileRead.VersionNumber >= version)
+                    {
+                        version = fileRead.VersionNumber;
+                        fileToSave = fileRead;
+                    }
+
+                    counter++;
+                }
+
+                //fileToSave = null problem (maybe because someone deleted the file in the exact moment this client was going to read it, etc)
+                if (fileToSave == null)
+                {
+                    return "File Doesnt Exist"; // MUDAR PARA EXCEPCAO???
+                }
+                else
+                {
+                    //Array registers update - monotonic and default
+                    if (semantics.Equals("monotonic"))
+                    {
+                        if (_filesInfo[fileRegister].Item2 == null || fileToSave.VersionNumber >= _filesInfo[fileRegister].Item2.VersionNumber)
+                        {
+                            _filesInfo[fileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(_filesInfo[fileRegister].Item1, fileToSave);
+                            _stringRegister[stringRegister] = fileToSave.FileContents;
+                            _success = true;
+                            _retry = 0;
+                        }
+                        else _retry--;
+                    }
+                    else if (semantics.Equals("default"))
                     {
                         _filesInfo[fileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(_filesInfo[fileRegister].Item1, fileToSave);
                         _stringRegister[stringRegister] = fileToSave.FileContents;
+                        _success = true;
+                        _retry = 0;
                     }
-                }
-                else if (semantics.Equals("default"))
-                {
-                    _filesInfo[fileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(_filesInfo[fileRegister].Item1, fileToSave);
-                    _stringRegister[stringRegister] = fileToSave.FileContents;
-                }
-                else throw new Exception("Unknown Semantics");
+                    else throw new Exception("Unknown Semantics");
 
+                }
+                if(!_success)
+                    LogPrint("Version too old, retrying...");
             }
+            if (!_success)
+                return ("Unable to fetch a recent version. Aborting");
 
             LogPrint("File Read Contents: " + _stringRegister[stringRegister]);
             LogPrint("Sucessful!");
@@ -495,7 +511,169 @@ namespace Client
             return;
         }
 
-        //Dump Operation
+        // Copy Operation
+        public string copy(int sourceFileRegister, string semantics, int destinFileRegister, byte[] salt)
+        {
+            LogPrint("Copy Operation");
+            LogPrint("\t Source File Register: " + sourceFileRegister + "Destination File Register: " + destinFileRegister +
+                "Using Semantics: " + semantics + "Salt: " + salt);
+
+            //Read variables restore
+            _readResponses = 0;
+            _readFilesResponses = new List<PADI_FS_Library.File>();
+
+            // Variables for retry (monotonic)
+            Boolean _success = false;
+            int _retry = 3;
+
+            FileMetadata fileMetadataToRead;
+            string contentToWrite;
+            PADI_FS_Library.File fileToSave = null;
+
+            //if the file register to read is null (that is, if that file does not exists in the client) sends an exception
+            if (_filesInfo[sourceFileRegister] != null)
+            {
+                fileMetadataToRead = _filesInfo[sourceFileRegister].Item1;
+            }
+            else throw new Exception("Registo na posicao " + sourceFileRegister + " nao existe");
+
+            while (_retry > 0)
+            {
+                //Call every Data Server that contains the file
+                foreach (Tuple<string, string> fileDataServerLocation in fileMetadataToRead.FileDataServersLocations)
+                {
+                    DataServerInterface dataServerProxy = (DataServerInterface)Activator.GetObject(
+                                                            typeof(DataServerInterface),
+                                                            fileDataServerLocation.Item1);
+
+                    // Alternative 2: asynchronous call with callback
+                    // Create delegate to remote method
+                    RemoteAsyncGetFileDelegate RemoteDel = new RemoteAsyncGetFileDelegate(dataServerProxy.read);
+                    // Create delegate to local callback
+                    AsyncCallback RemoteCallback = new AsyncCallback(this.GetFileRemoteAsyncCallBack);
+                    // Call remote method
+                    IAsyncResult RemAr = RemoteDel.BeginInvoke(fileDataServerLocation.Item2, semantics, RemoteCallback, null);
+                }
+
+                //Waits for a quorum of Read Responses
+                while (_readResponses < fileMetadataToRead.ReadQuorum)
+                {
+                    continue;
+                }
+
+                //After getting a quorum decides what to save (the most recent version of the files obtained)
+                int counter = 0;
+                int version = -1;
+                foreach (PADI_FS_Library.File fileRead in _readFilesResponses)
+                {
+                    if (counter == fileMetadataToRead.ReadQuorum)
+                        break;
+
+                    if (fileRead.VersionNumber >= version)
+                    {
+                        version = fileRead.VersionNumber;
+                        fileToSave = fileRead;
+                    }
+
+                    counter++;
+                }
+
+                //fileToSave = null problem (maybe because someone deleted the file in the exact moment this client was going to read it, etc)
+                if (fileToSave == null)
+                {
+                    return "File Doesnt Exist"; // MUDAR PARA EXCEPCAO???
+                }
+                else
+                {
+                    //Array registers update - monotonic and default
+                    if (semantics.Equals("monotonic"))
+                    {
+                        if (_filesInfo[sourceFileRegister].Item2 == null || fileToSave.VersionNumber >= _filesInfo[sourceFileRegister].Item2.VersionNumber)
+                        {
+                            _filesInfo[sourceFileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(_filesInfo[sourceFileRegister].Item1, fileToSave);
+                            _success = true;
+                            _retry = 0;
+                        }
+                        else _retry--;
+                    }
+                    else if (semantics.Equals("default"))
+                    {
+                        _filesInfo[sourceFileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(_filesInfo[sourceFileRegister].Item1, fileToSave);
+                        _success = true;
+                        _retry = 0;
+                    }
+                    else throw new Exception("Unknown Semantics");
+
+                }
+                if (!_success)
+                    LogPrint("Version too old, retrying...");
+            }
+            if (!_success)
+                return ("Unable to fetch a recent version. Aborting");
+
+            contentToWrite = fileToSave.FileContents + salt;
+
+            //Write variables restore
+            _writeResponses = 0;
+
+            PADI_FS_Library.File fileToWrite = _filesInfo[destinFileRegister].Item2;
+
+            //if the file register to write is null (that is, if that file does not exists in the client) then
+            //the version number used to write will be 0, otherwise it will be the version number of the existing file plus one
+            int versionNumberToWrite = 1;
+            FileMetadata fileMetadataToWrite;
+            if (fileToWrite != null)
+                versionNumberToWrite = fileToWrite.VersionNumber + 1;
+            fileMetadataToWrite = _filesInfo[destinFileRegister].Item1;
+
+
+            //LogPrint("---------VERSION TO WRITE: " + versionNumberToWrite);
+            //LogPrint("---------POSITION IN FILES CONTENTS FILES META: " + _posOfFilesContentInFilesMetadata[fileRegister]);
+
+
+            //Call every Data Server that contains the file
+            foreach (Tuple<string, string> fileDataServerLocation in fileMetadataToWrite.FileDataServersLocations)
+            {
+                DataServerInterface dataServerProxy = (DataServerInterface)Activator.GetObject(
+                                                        typeof(DataServerInterface),
+                                                        fileDataServerLocation.Item1);
+
+                // Alternative 2: asynchronous call with callback
+                // Create delegate to remote method
+                RemoteAsyncWriteFileDelegate RemoteDel = new RemoteAsyncWriteFileDelegate(dataServerProxy.write);
+                // Create delegate to local callback
+                AsyncCallback RemoteCallback = new AsyncCallback(this.WriteFileRemoteAsyncCallBack);
+                // Call remote method
+                IAsyncResult RemAr = RemoteDel.BeginInvoke(fileDataServerLocation.Item2, versionNumberToWrite, contentToWrite, RemoteCallback, null);
+            }
+
+            //LogPrint("WRITE RESPONSES: " + _writeResponses);
+            //LogPrint("WRITE QUORUM: " + fileMetadataToWrite.WriteQuorum);
+
+            //Waits for a quorum of Write Responses
+            while (_writeResponses < fileMetadataToWrite.WriteQuorum) //ESTA A HAVER PROBLEMAS AQUI ???
+            {
+                continue;
+            }
+
+
+            //Updates local registers (not really necessary because before any write the client has to make a read)
+            //Info: They arent updated if file didnt exist before
+            if (fileToWrite == null)
+            {
+                PADI_FS_Library.File newFile = new PADI_FS_Library.File(fileMetadataToWrite.Filename, contentToWrite, versionNumberToWrite);
+                _filesInfo[destinFileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(fileMetadataToWrite, newFile);
+            }
+            else
+            {
+                _filesInfo[destinFileRegister].Item2.VersionNumber = versionNumberToWrite;
+                _filesInfo[destinFileRegister].Item2.FileContents = contentToWrite;
+            }
+
+            return contentToWrite;
+        }
+
+        // Dump Operation
         public string dump()
         {
             LogPrint("Dump Operation");

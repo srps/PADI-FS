@@ -108,7 +108,7 @@ namespace PuppetMaster
 
                         /*Falta aqui a passagem dos links para os metadataservers ???*/
                         //Creation of process client
-                        Process.Start("..\\..\\..\\Client\\bin\\Debug\\Client.exe", commandProcess + " " + clientPort);
+                        Process.Start(@"..\..\..\Client\bin\Debug\Client.exe", commandProcess + " " + clientPort);
 
                         //Saving client stuff in puppet master
                         string newCLientURL = "tcp://localhost:" + clientPort + "/" + commandProcess;
@@ -143,7 +143,7 @@ namespace PuppetMaster
                         int clientPort = clientStartPort + Convert.ToInt32(clientInfo[1]);
 
                         //Creation of process client
-                        Process.Start("..\\..\\..\\Client\\bin\\Debug\\Client.exe", commandProcess + " " + clientPort);
+                        Process.Start(@"..\..\..\Client\bin\Debug\Client.exe", commandProcess + " " + clientPort);
 
                         //Saving client stuff in puppet master
                         string newCLientURL = "tcp://localhost:" + clientPort + "/" + commandProcess;
@@ -174,7 +174,7 @@ namespace PuppetMaster
                         int clientPort = clientStartPort + Convert.ToInt32(clientInfo[1]);
 
                         //Creation of process client
-                        Process.Start("..\\..\\..\\Client\\bin\\Debug\\Client.exe", commandProcess + " " + clientPort);
+                        Process.Start(@"..\..\..\Client\bin\Debug\Client.exe", commandProcess + " " + clientPort);
 
                         //Saving client stuff in puppet master
                         string newCLientURL = "tcp://localhost:" + clientPort + "/" + commandProcess;
@@ -205,7 +205,7 @@ namespace PuppetMaster
                         int clientPort = clientStartPort + Convert.ToInt32(clientInfo[1]);
 
                         //Creation of process client
-                        Process.Start("..\\..\\..\\Client\\bin\\Debug\\Client.exe", commandProcess + " " + clientPort);
+                        Process.Start(@"..\..\..\Client\bin\Debug\Client.exe", commandProcess + " " + clientPort);
 
                         //Saving client stuff in puppet master
                         string newCLientURL = "tcp://localhost:" + clientPort + "/" + commandProcess;
@@ -236,7 +236,7 @@ namespace PuppetMaster
                         int clientPort = clientStartPort + Convert.ToInt32(clientInfo[1]);
 
                         //Creation of process client
-                        Process.Start("..\\..\\..\\Client\\bin\\Debug\\Client.exe", commandProcess + " " + clientPort);
+                        Process.Start(@"..\..\..\Client\bin\Debug\Client.exe", commandProcess + " " + clientPort);
 
                         //Saving client stuff in puppet master
                         string newCLientURL = "tcp://localhost:" + clientPort + "/" + commandProcess;
