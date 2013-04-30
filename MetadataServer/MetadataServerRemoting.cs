@@ -118,8 +118,8 @@ namespace MetadataServer
                     break;
             }
 
-            //If there are missing DataServers to associate to this file, there is created a task for it (which inclued the number of DataServers missing to associate to this file)
-            //and it will be executed when appropriate
+            // If there are missing DataServers to associate to this file, it creates a task for it (which inclued the number of DataServers missing to associate to this file)
+            // and it will be executed when appropriate
             if (counter < numberOfDataServers)
             {
                 _filesWithMissingDataServers.Add(new Tuple<string, int>(filename, numberOfDataServers - counter));
@@ -132,19 +132,19 @@ namespace MetadataServer
             return newFileMetadata;
         }
 
-        //Open Operation
+        // Open Operation
         public FileMetadata open(string filename)
         {
             return _filesMetadata[filename];
         }
 
-        //Close Operation
+        // Close Operation
         public void close(string filename)
         {
             return;
         }
 
-        //Delete Operation
+        // Delete Operation
         public void delete(string filename)
         {
             // If filename exists, delete filemetada stored from filename
@@ -153,7 +153,7 @@ namespace MetadataServer
                 _filesMetadata.Remove(filename);
             else return;
             
-            //Delete association between filename and local filename in data servers, but saves local filename for next operations
+            // Delete association between filename and local filename in data servers, but saves local filename for next operations
             string local_dataserver_filename_associated = null;
             if (_dataServersAssociatedFilenames.ContainsKey(filename))
             {
@@ -161,8 +161,8 @@ namespace MetadataServer
                 _dataServersAssociatedFilenames.Remove(filename);
             }
             
-            //For each data server associated with that local filename, tell them to delete the file, decrement the number if files
-            //existing in that data server and in the end delete the association between this local file and those data servers
+            // For each data server associated with that local filename, tell them to delete the file, decrement the number if files
+            // existing in that data server and in the end delete the association between this local file and those data servers
             /*FALTA A PARTE DE OS DATA SERVERS ESTAREM EM BAIXO*/
             if (_localFilesDataServers.ContainsKey(local_dataserver_filename_associated))
             {
