@@ -368,7 +368,7 @@ namespace PuppetMaster
                         int metadataServerPort = metadataServerStartPort + Convert.ToInt32(metadataInfo[1]);
 
                         //Creation of process MetadataServer
-                        Process.Start("..\\..\\..\\MetadataServer\\bin\\Debug\\MetadataServer.exe", commandProcess + " " + metadataServerPort);
+                        Process.Start(@"..\..\..\MetadataServer\bin\Debug\MetadataServer.exe", commandProcess + " " + metadataServerPort);
 
                         //Saving MetadataServer stuff in puppet master
                         string newMetadataServerURL = "tcp://localhost:" + metadataServerPort + "/" + commandProcess;
@@ -408,7 +408,7 @@ namespace PuppetMaster
                         int dataServerPort = dataServerStartPort + Convert.ToInt32(dataInfo[1]);
 
                         //Creation of process DataServer
-                        Process.Start("..\\..\\..\\DataServer\\bin\\Debug\\DataServer.exe", commandProcess + " " + dataServerPort);
+                        Process.Start(@"..\..\..\DataServer\bin\Debug\DataServer.exe", commandProcess + " " + dataServerPort);
 
                         //Saving DataServer stuff in puppet master
                         string newDataServerURL = "tcp://localhost:" + dataServerPort + "/" + commandProcess;
@@ -441,7 +441,7 @@ namespace PuppetMaster
                         int clientPort = clientStartPort + Convert.ToInt32(clientInfo[1]);
 
                         //Creation of process client
-                        Process.Start("..\\..\\..\\Client\\bin\\Debug\\Client.exe", commandProcess + " " + clientPort);
+                        Process.Start(@"..\..\..\Client\bin\Debug\Client.exe", commandProcess + " " + clientPort);
 
                         //Saving client stuff in puppet master
                         string newCLientURL = "tcp://localhost:" + clientPort + "/" + commandProcess;
@@ -473,7 +473,7 @@ namespace PuppetMaster
                         int dataServerPort = dataServerStartPort + Convert.ToInt32(dataInfo[1]);
 
                         //Creation of process DataServer
-                        Process.Start("..\\..\\..\\DataServer\\bin\\Debug\\DataServer.exe", commandProcess + " " + dataServerPort);
+                        Process.Start(@"..\..\..\DataServer\bin\Debug\DataServer.exe", commandProcess + " " + dataServerPort);
 
                         //Saving DataServer stuff in puppet master
                         string newDataServerURL = "tcp://localhost:" + dataServerPort + "/" + commandProcess;
@@ -504,7 +504,7 @@ namespace PuppetMaster
                         int medataServerPort = metadataServerStartPort + Convert.ToInt32(metadataInfo[1]);
 
                         //Creation of process DataServer
-                        Process.Start("..\\..\\..\\MetadataServer\\bin\\Debug\\MetadataServer.exe", commandProcess + " " + medataServerPort);
+                        Process.Start(@"..\..\..\MetadataServer\bin\Debug\MetadataServer.exe", commandProcess + " " + medataServerPort);
 
                         //Saving DataServer stuff in puppet master
                         string newMetadataServerURL = "tcp://localhost:" + medataServerPort + "/" + commandProcess;
