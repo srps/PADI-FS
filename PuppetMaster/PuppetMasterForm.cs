@@ -18,12 +18,20 @@ using System.Runtime.Remoting.Channels;
 using System.Net.Sockets;
 
 
+using System.Runtime.Remoting.Messaging;
+
+
 using System.Diagnostics;
 
 using PADI_FS_Library;
 
 namespace PuppetMaster
 {
+
+    //Delegate for Exescript Operation
+    public delegate void RemoteAsyncExescriptDelegate(List<string> commandsToExecute);
+
+
     /// <summary>
     /// Puppet Master Class
     /// </summary>
@@ -86,7 +94,6 @@ namespace PuppetMaster
             String commandType = null;
             String commandProcess = null;
             String textToWrite;
-            ArrayList commandParameters = new ArrayList();
           
             //Deals with the command, saving some of its properties
             command = command.Replace(",", "");
@@ -515,6 +522,63 @@ namespace PuppetMaster
                     DumpPrint(dumpInfo);
 
                     LogPrint("Dump of " + commandProcess + " successful!");
+                }
+
+                return;
+            }
+
+            if (commandType.ToUpper() == "EXESCRIPT")
+            {
+                //if its a client
+                if (commandProcess[0] == 'c')
+                {
+                    //if that client doesnt exist in puppet master "database" we have to create it
+                    if (!clients.ContainsKey(commandProcess))
+                    {
+                        string[] clientInfo = commandProcess.Split('-');
+                        int clientPort = clientStartPort + Convert.ToInt32(clientInfo[1]);
+
+                        //Creation of process client
+                        Process.Start("..\\..\\..\\Client\\bin\\Debug\\Client.exe", commandProcess + " " + clientPort);
+
+                        //Saving client stuff in puppet master
+                        string newCLientURL = "tcp://localhost:" + clientPort + "/" + commandProcess;
+                        ClientInterface clientProxy = (ClientInterface)Activator.GetObject(
+                                                        typeof(ClientInterface),
+                                                        newCLientURL);
+
+                        clients.Add(commandProcess, new Tuple<string, ClientInterface>(newCLientURL, clientProxy));
+                    }
+
+                    //
+	                // Read in the file given line-by-line, and store it all in a List.
+	                //
+	                List<string> fileCommandsToSend = new List<string>();
+	                using (StreamReader reader = new StreamReader(commandWords[2]))
+	                {
+	                    string line;
+	                    while ((line = reader.ReadLine()) != null)
+	                    {
+                            //If its a comment continue
+                            if (line[0] == '#')
+                                continue;
+
+                            //Otherwise adds the comand to the list to send to the client
+		                    fileCommandsToSend.Add(line); // Add to list.
+	                    }
+	                }
+
+                    //call to the client for running Exescript
+                    clients[commandProcess].Item2.exescript(fileCommandsToSend);
+
+                    // Alternative 1: asynchronous call without callback
+                    // Create delegate to remote method
+                    RemoteAsyncExescriptDelegate RemoteDel = new RemoteAsyncExescriptDelegate(clients[commandProcess].Item2.exescript);
+                    // Call delegate to remote method
+                    IAsyncResult RemAr = RemoteDel.BeginInvoke(fileCommandsToSend, null, null);
+                                                  
+
+                    LogPrint("Exescript of " + commandProcess + " successful!");
                 }
 
                 return;

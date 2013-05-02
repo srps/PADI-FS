@@ -19,6 +19,7 @@ namespace PADI_FS_Library
         string copy(int sourceFileRegister, string semantics, int destinFileRegister, byte[] salt);
 
         string dump();
+        void exescript(List<string> commandsToExecute);
 
         //Other Operations
 

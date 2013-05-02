@@ -716,5 +716,76 @@ namespace Client
 
             return toReturn;
         }
+
+        //Exescript Operation
+        void exescript(List<string> commandsToExecute)
+        {
+            string commandToExecute = null;
+            string commandType = null;
+            string[] commandWords = null;
+
+
+            foreach (string command in commandsToExecute)
+            {
+                commandToExecute = command.Replace(",", "");
+                commandWords = commandToExecute.Split(' ');
+                commandType = commandWords[0];
+
+                if (commandType.ToUpper() == "CREATE")
+                {
+                    create(commandWords[2], Convert.ToInt32(commandWords[3]), Convert.ToInt32(commandWords[4]), Convert.ToInt32(commandWords[5]));
+                }
+
+                if (commandType.ToUpper() == "OPEN")
+                {
+                    open(commandWords[2]);
+                }
+
+                if (commandType.ToUpper() == "CLOSE")
+                {
+                    close(commandWords[2]);
+                }
+
+                if (commandType.ToUpper() == "DELETE")
+                {
+                    delete(commandWords[2]);
+                }
+
+                if (commandType.ToUpper() == "READ")
+                {
+                    read(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]));
+                }
+
+                if (commandType.ToUpper() == "WRITE")
+                {
+                    string textToWrite = null;
+
+                    if (commandToExecute.Contains('\"'))
+                    {
+                        textToWrite = commandToExecute.Split('\"')[1];
+                        write(Convert.ToInt32(commandWords[2]), textToWrite);
+                    }
+                    else write(Convert.ToInt32(commandWords[2]), Convert.ToInt32(commandWords[3]));
+                }
+
+                if (commandType.ToUpper() == "COPY")
+                {
+                    string salt = "";
+                    if (commandToExecute.Contains('\"'))
+                    {
+                        salt = commandToExecute.Split('\"')[1];
+                    }
+
+                    copy(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]), System.Text.Encoding.UTF8.GetBytes(salt));
+                }
+
+                if (commandType.ToUpper() == "DUMP")
+                {
+                    dump();
+                }
+
+
+            }
+        }
     }
 }
