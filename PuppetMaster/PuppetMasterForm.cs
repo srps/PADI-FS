@@ -568,9 +568,9 @@ namespace PuppetMaster
 	                    }
 	                }
 
+                   
+                                     
                     //call to the client for running Exescript
-                    clients[commandProcess].Item2.exescript(fileCommandsToSend);
-
                     // Alternative 1: asynchronous call without callback
                     // Create delegate to remote method
                     RemoteAsyncExescriptDelegate RemoteDel = new RemoteAsyncExescriptDelegate(clients[commandProcess].Item2.exescript);

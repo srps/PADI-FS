@@ -718,7 +718,7 @@ namespace Client
         }
 
         //Exescript Operation
-        void exescript(List<string> commandsToExecute)
+        public void exescript(List<string> commandsToExecute)
         {
             string commandToExecute = null;
             string commandType = null;
@@ -727,6 +727,9 @@ namespace Client
 
             foreach (string command in commandsToExecute)
             {
+
+                LogPrint(command);
+
                 commandToExecute = command.Replace(",", "");
                 commandWords = commandToExecute.Split(' ');
                 commandType = commandWords[0];
