@@ -130,7 +130,21 @@ namespace MetadataServer
         //Auxiliar Functions
 
 
-        public void Ping(string _MDServerName) { }
+        public MetadataServerInformation Ping(string _MDServerName)
+        {
+            _aliveServers.Add(_MDServerName, true);
+            return new MetadataServerInformation(_aliveServers,
+                _metadataProxies,
+                _dataServersURLS,
+                _dataServersProxies,
+                _filesMetadata,
+                _dataServersNumberOfFiles,
+                _dataServersAssociatedFilenames,
+                _localFilesDataServers,
+                _filesWithMissingDataServers,
+                _numberOfClientsUsingExistingFile,
+                _fileUniqueID);
+        }
 
         public MetadataServerInformation TakeControl(string _MDServerName) {
             _isMaster = false;

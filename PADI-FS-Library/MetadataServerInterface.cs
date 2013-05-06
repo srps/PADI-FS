@@ -23,6 +23,6 @@ namespace PADI_FS_Library
         bool IsAlive();
         bool IsMaster();
         MetadataServerInformation TakeControl(string metadataServerName);
-        bool Ping(string metadataServerName);
+        MetadataServerInformation Ping(string metadataServerName);
     }
 }

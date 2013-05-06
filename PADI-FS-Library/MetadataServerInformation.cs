@@ -6,7 +6,7 @@ using System.Text;
 namespace PADI_FS_Library
 {
     [Serializable]
-    class MetadataServerInformation
+    public class MetadataServerInformation
     {
         private Dictionary<string, bool> _aliveServers;
 
