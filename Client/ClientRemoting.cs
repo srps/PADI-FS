@@ -39,8 +39,8 @@ namespace Client
         int _writeResponses = 0;
 
 
-        //MetadataServers Proxys
-        Dictionary<string, MetadataServerInterface> _metadataServersProxys;
+        //MetadataServers Proxies
+        Dictionary<string, MetadataServerInterface> _metadataServersProxies;
         //Arrays with 10 positions for storing file Metadata being used
         Tuple<FileMetadata, PADI_FS_Library.File>[] _filesInfo;
         //Arrays with 10 positions for storing files (contents) being used...
@@ -52,7 +52,7 @@ namespace Client
             _clientName = clientName;
             _clientPort = clientPort;
 
-            _metadataServersProxys = new Dictionary<string, MetadataServerInterface>();
+            _metadataServersProxies = new Dictionary<string, MetadataServerInterface>();
             _filesInfo = new Tuple<FileMetadata, PADI_FS_Library.File>[numberOfRegisters];
             _stringRegister = new String[numberOfRegisters];
             for (int i = 0; i < numberOfRegisters; i++)
@@ -61,7 +61,7 @@ namespace Client
                 _stringRegister[i] = "";
             }
 
-            //Populate Metadata Servers Proxys
+            //Populate Metadata Servers Proxies
             TextReader metadataServersPorts = new StreamReader(@"..\..\..\Client\bin\Debug\MetadataServersPorts.txt");
             string metadataServersPortsLine;
             string[] metadataServersPortsLineWords;
@@ -76,7 +76,7 @@ namespace Client
                                                               typeof(MetadataServerInterface),
                                                               metadataServerURL);
 
-                _metadataServersProxys.Add(metadataServerName, metadataServerToAdd);
+                _metadataServersProxies.Add(metadataServerName, metadataServerToAdd);
             }
 
         }
@@ -146,11 +146,11 @@ namespace Client
             FileMetadata fileMetadataToCreate = null;
 
             //If client calls each MetadataServer in order, then if someone awnsers it will be the master/primary
-            foreach(string metadataServerName in _metadataServersProxys.Keys)
+            foreach(string metadataServerName in _metadataServersProxies.Keys)
             {
                 try
                 {
-                    fileMetadataToCreate = _metadataServersProxys[metadataServerName].create(filename, numberOfDataServers, readQuorum, writeQuorum);
+                    fileMetadataToCreate = _metadataServersProxies[metadataServerName].create(filename, numberOfDataServers, readQuorum, writeQuorum);
                     break;
                 }
                 catch (Exception)
@@ -175,11 +175,11 @@ namespace Client
 
             FileMetadata fileMetadataToOpen = null;
 
-            foreach (string metadataServerName in _metadataServersProxys.Keys)
+            foreach (string metadataServerName in _metadataServersProxies.Keys)
             {
                 try
                 {
-                    fileMetadataToOpen = _metadataServersProxys[metadataServerName].open(filename);
+                    fileMetadataToOpen = _metadataServersProxies[metadataServerName].open(filename);
                     break;
                 }
                 catch (Exception)
@@ -202,11 +202,11 @@ namespace Client
             LogPrint("Close Operation");
             LogPrint("\tFile: " + filename);
 
-            foreach (string metadataServerName in _metadataServersProxys.Keys)
+            foreach (string metadataServerName in _metadataServersProxies.Keys)
             {
                 try
                 {
-                    _metadataServersProxys[metadataServerName].close(filename);
+                    _metadataServersProxies[metadataServerName].close(filename);
 
                     for (int i = 0; i < numberOfRegisters; i++)
                     {
@@ -236,11 +236,11 @@ namespace Client
             LogPrint("Delete Operation");
             LogPrint("\tFile: " + filename);
 
-            foreach (string metadataServerName in _metadataServersProxys.Keys)
+            foreach (string metadataServerName in _metadataServersProxies.Keys)
             {
                 try
                 {
-                    _metadataServersProxys[metadataServerName].delete(filename);
+                    _metadataServersProxies[metadataServerName].delete(filename);
 
                     for (int i = 0; i < numberOfRegisters; i++)
                     {

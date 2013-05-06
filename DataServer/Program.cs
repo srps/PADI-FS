@@ -39,7 +39,7 @@ namespace DataServer
             Console.WriteLine("Registered!");
             
             //Registo do DataServer nos MetadataServers (basta enviar a um, ele expande o registo)
-            Dictionary<string, MetadataServerInterface> metadataServersProxys = new Dictionary<string,MetadataServerInterface>();
+            Dictionary<string, MetadataServerInterface> metadataServersProxies = new Dictionary<string,MetadataServerInterface>();
             TextReader metadataServersPorts = new StreamReader(@"..\..\..\DataServer\bin\Debug\MetadataServersPorts.txt");
             string metadataServersPortsLine;
             string[] metadataServersPortsLineWords;
@@ -54,13 +54,13 @@ namespace DataServer
                                                               typeof(MetadataServerInterface),
                                                               metadataServerURL);
 
-                metadataServersProxys.Add(metadataServerName, metadataServerToAdd);
+                metadataServersProxies.Add(metadataServerName, metadataServerToAdd);
             }
 
             
-            foreach (string metadataServerName in metadataServersProxys.Keys)
+            foreach (string metadataServerName in metadataServersProxies.Keys)
             {
-                metadataServersProxys[metadataServerName].registerDataServer(dataServerName, "tcp://localhost:" + dataServerPort + "/" + dataServerName);
+                metadataServersProxies[metadataServerName].registerDataServer(dataServerName, "tcp://localhost:" + dataServerPort + "/" + dataServerName);
             }
             
 
