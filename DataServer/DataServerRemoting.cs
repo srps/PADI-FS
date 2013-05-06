@@ -5,6 +5,10 @@ using System.Text;
 
 using PADI_FS_Library;
 
+using System.Threading;
+using System.Collections;
+
+
 
 
 namespace DataServer
@@ -47,20 +51,55 @@ namespace DataServer
         // Read Operation
         public File read(string filename, string semantics) //semantics ... QUAL O USO DISTO????
         {
+                   
 
-            LogPrint("Read Operation");
-            LogPrint("\t Filename: " + filename + " Semantics: " + semantics);
-
-            if (_filesData.ContainsKey(filename))
+            if (_isInFreezeMode)
             {
-                LogPrint("Successful!");
 
-                return _filesData[filename];
+                //Freeze recover mode
+                lock (this)
+                {
+                    Monitor.Wait(this);
+                }
+
+                LogPrint("Read Operation");
+                LogPrint("\t Filename: " + filename + " Semantics: " + semantics);
+
+                if (_filesData.ContainsKey(filename))
+                {
+                    LogPrint("Successful!");
+
+                    lock (this) { Monitor.Pulse(this); }
+
+                    return _filesData[filename];
+                }
+                else
+                {
+                    lock (this) { Monitor.Pulse(this); }
+
+                    throw new Exception();
+                }
+
             }
             else
             {
-                throw new Exception();
+                LogPrint("Read Operation");
+                LogPrint("\t Filename: " + filename + " Semantics: " + semantics);
+
+                //Normal operating
+                if (_filesData.ContainsKey(filename))
+                {
+                    LogPrint("Successful!");
+
+                    return _filesData[filename];
+                }
+                else
+                {
+                    throw new Exception();
+                }
             }
+
+            
 
         }
 
@@ -68,17 +107,44 @@ namespace DataServer
         public void write(string filename, int versionNumber, string contentToWrite)
         {
 
-            LogPrint("Write Operation");
-            LogPrint("\t Filename: " + filename + " Version Number: " + versionNumber + " Contents: " + contentToWrite);
-
-            if (_filesData.ContainsKey(filename))
+            if (_isInFreezeMode)
             {
-                _filesData[filename].VersionNumber = versionNumber;
-                _filesData[filename].FileContents = contentToWrite;
+                //Freeze recover mode
+                lock (this)
+                {
+                    Monitor.Wait(this);
+                }
+
+                LogPrint("Write Operation");
+                LogPrint("\t Filename: " + filename + " Version Number: " + versionNumber + " Contents: " + contentToWrite);
+
+                if (_filesData.ContainsKey(filename))
+                {
+                    _filesData[filename].VersionNumber = versionNumber;
+                    _filesData[filename].FileContents = contentToWrite;
+                    lock (this) { Monitor.Pulse(this); }
+                }
+                else
+                {
+                    lock (this) { Monitor.Pulse(this); }
+                    throw new Exception();
+                }
             }
             else
             {
-                throw new Exception();
+                LogPrint("Write Operation");
+                LogPrint("\t Filename: " + filename + " Version Number: " + versionNumber + " Contents: " + contentToWrite);
+
+                //Normal operating
+                if (_filesData.ContainsKey(filename))
+                {
+                    _filesData[filename].VersionNumber = versionNumber;
+                    _filesData[filename].FileContents = contentToWrite;
+                }
+                else
+                {
+                    throw new Exception();
+                }
             }
 
             LogPrint("Successful!");
@@ -86,10 +152,19 @@ namespace DataServer
             return;
         }
 
+        //Freeze Operation
+        public void freeze()
+        {
+            _isInFreezeMode = true;
+            LogPrint("--------------------------FREEZE MODE BEGINS-----------------------------");
+        }
+
         //Unfreeze Operation
         public void unfreeze()
         {
             _isInFreezeMode = false;
+            LogPrint("---------------------------FREEZE MODE ENDS------------------------------");
+            lock (this) { Monitor.Pulse(this); }
         }
 
         //Dump Operation
@@ -121,13 +196,52 @@ namespace DataServer
         //Other Operations
         public void createFilename(string filename)
         {
-            _filesData.Add(filename, new File(filename, "", 0));
+            if(!_filesData.ContainsKey(filename))
+                _filesData.Add(filename, new File(filename, "", 0));
+
+            /*if (_isInFreezeMode)
+            {
+                //Freeze recover mode
+                lock (this)
+                {
+                    Monitor.Wait(this);
+                }
+
+                if(!_filesData.ContainsKey(filename))
+                    _filesData.Add(filename, new File(filename, "", 0));
+
+                Monitor.Pulse(this);
+            }
+            else
+            {
+                if(!_filesData.ContainsKey(filename))
+                    _filesData.Add(filename, new File(filename, "", 0));
+            }*/
         }
 
         public void deleteFilename(string filename)
         {
-            if(_filesData.ContainsKey(filename))
+            if (_filesData.ContainsKey(filename))
                 _filesData.Remove(filename);
+
+            /*if (_isInFreezeMode)
+            {
+                //Freeze recover mode
+                lock (this)
+                {
+                    Monitor.Wait(this);
+                }
+
+                if (_filesData.ContainsKey(filename))
+                    _filesData.Remove(filename);
+
+                Monitor.Pulse(this);
+            }
+            else
+            {
+                if (_filesData.ContainsKey(filename))
+                    _filesData.Remove(filename);
+            }*/
         }
     }
 }

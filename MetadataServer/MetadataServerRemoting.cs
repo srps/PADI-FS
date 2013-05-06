@@ -7,6 +7,7 @@ using PADI_FS_Library;
 
 namespace MetadataServer
 {
+
     /// <summary>
     /// MetadataServer Remoting Class
     /// </summary>
@@ -37,7 +38,7 @@ namespace MetadataServer
         Dictionary<string, List<string>> _localFilesDataServers;
 
         //List of tasks which will be used to associate missing DataServers to files
-        List<Tuple<string, int>> _filesWithMissingDataServers;
+        Dictionary<string, int> _filesWithMissingDataServers;
 
         //Association between existing files and number of clients that are using them
         Dictionary<string, int> _numberOfClientsUsingExistingFile; /*Nao esta a ser usado*/
@@ -64,7 +65,7 @@ namespace MetadataServer
             _dataServersAssociatedFilenames = new Dictionary<string, string>();
             _localFilesDataServers = new Dictionary<string, List<string>>();
 
-            _filesWithMissingDataServers = new List<Tuple<string, int>>();
+            _filesWithMissingDataServers = new Dictionary<string, int>();
 
 
             _fileUniqueName = "LOCAL-DATASERVER-FILENAME-";
@@ -85,16 +86,32 @@ namespace MetadataServer
             return filenameToReturn;
         }
 
+        /*
+        public bool RemoveFromFilesWithMissingDataServersPredicate(Tuple<string, int> element)
+        {
+            if (element.Item2 == 0)
+                return true;
+            else return false;
+        }*/
+
 
         //Main Operations
 
         //Create Operation
         public FileMetadata create(string filename, int numberOfDataServers, int readQuorum, int writeQuorum)
         {
+            //Verification if the file with this filename already exists, if it does, returns an error
+            if (_filesMetadata.ContainsKey(filename))
+            {
+                //TODO
+            }
+
+
+
             //Associates this filename with a unique filename for local DataServer storage
             string associatedFilename = generateFilenameForDataServers();
             _dataServersAssociatedFilenames.Add(filename, associatedFilename);
-            //Creates an association between filename and a list with 
+            //Creates an association between filename and a list with data servers to fill in
             _localFilesDataServers.Add(associatedFilename, new List<string>());
 
 
@@ -108,7 +125,7 @@ namespace MetadataServer
             foreach (string dataServerName in sortedDataServersNumberOfFiles.Keys)
             {
                 _dataServersProxys[dataServerName].createFilename(associatedFilename);
-                _dataServersNumberOfFiles[dataServerName] = _dataServersNumberOfFiles[dataServerName]++;
+                _dataServersNumberOfFiles[dataServerName] = _dataServersNumberOfFiles[dataServerName] + 1;
                 _localFilesDataServers[associatedFilename].Add(dataServerName);
 
                 dataServersLocalFilenames.Add(new Tuple<string, string>(_dataServersURLS[dataServerName], associatedFilename));
@@ -118,11 +135,11 @@ namespace MetadataServer
                     break;
             }
 
-            // If there are missing DataServers to associate to this file, it creates a task for it (which inclued the number of DataServers missing to associate to this file)
+            // If there are missing DataServers to associate to this file, it creates a task for it (which include the number of DataServers missing to associate to this file)
             // and it will be executed when appropriate
             if (counter < numberOfDataServers)
             {
-                _filesWithMissingDataServers.Add(new Tuple<string, int>(filename, numberOfDataServers - counter));
+                _filesWithMissingDataServers.Add(filename, numberOfDataServers - counter);
             }
 
             FileMetadata newFileMetadata = new FileMetadata(filename, numberOfDataServers, readQuorum, writeQuorum, dataServersLocalFilenames);
@@ -178,10 +195,10 @@ namespace MetadataServer
             }
             
             //If exists an association saying that there are still DataServers to add to this file, delete it
-            foreach (Tuple<string, int> fileWithMissingDataServers in _filesWithMissingDataServers)
-                if(fileWithMissingDataServers.Item1 == filename)
+            foreach (string fileWithMissingDataServersName in _filesWithMissingDataServers.Keys)
+                if(fileWithMissingDataServersName == filename)
                 {
-                    _filesWithMissingDataServers.Remove(fileWithMissingDataServers);
+                    _filesWithMissingDataServers.Remove(fileWithMissingDataServersName);
                     break;
                 }
             
@@ -234,6 +251,29 @@ namespace MetadataServer
             _dataServersURLS.Add(dataServerName, dataServerURL);
             _dataServersProxys.Add(dataServerName, dataServerProxy);
             _dataServersNumberOfFiles.Add(dataServerName, 0);
+
+            //LogPrint("COUNT: " + _filesWithMissingDataServers.Count);
+            //for each file with missing data servers, associate this data server
+            foreach (string fileWithMissingDataServerName in _filesWithMissingDataServers.Keys)
+            {
+                _dataServersProxys[dataServerName].createFilename(_dataServersAssociatedFilenames[fileWithMissingDataServerName]);
+                _dataServersNumberOfFiles[dataServerName] = _dataServersNumberOfFiles[dataServerName] + 1;
+                _localFilesDataServers[_dataServersAssociatedFilenames[fileWithMissingDataServerName]].Add(dataServerName);
+                _filesMetadata[fileWithMissingDataServerName].FileDataServersLocations.Add(new Tuple<string, string>(dataServerURL, _dataServersAssociatedFilenames[fileWithMissingDataServerName]));
+            }
+
+            List<string> filesWithMissingDataServersToList = _filesWithMissingDataServers.Keys.ToList();
+            foreach (string fileWithMissingDataServerName in filesWithMissingDataServersToList)
+                _filesWithMissingDataServers[fileWithMissingDataServerName] = _filesWithMissingDataServers[fileWithMissingDataServerName] - 1;
+
+            //if there is any file where there are not anymore data servers to associate, then remove it from appropriate list
+            foreach (KeyValuePair<string, int> s in _filesWithMissingDataServers.Where(p => p.Value == 0).ToList())
+            {
+                _filesWithMissingDataServers.Remove(s.Key);
+            }
+
+
+
         }
     }
 }

@@ -394,6 +394,41 @@ namespace PuppetMaster
                 return;
             }
 
+
+            //FREEZE COMMAND - (ONLY TO DATASERVERS)
+            if (commandType.ToUpper() == "FREEZE")
+            {
+                //if its a data server (just to check)
+                if (commandProcess[0] == 'd')
+                {
+                    //if that DataServer doesnt exist in puppet master "database" we have to create it
+                    if (!dataServers.ContainsKey(commandProcess))
+                    {
+                        //Check what DataServer is (the number of it)
+                        string[] dataInfo = commandProcess.Split('-');
+                        int dataServerPort = dataServerStartPort + Convert.ToInt32(dataInfo[1]);
+
+                        //Creation of process DataServer
+                        Process.Start(@"..\..\..\DataServer\bin\Debug\DataServer.exe", commandProcess + " " + dataServerPort);
+
+                        //Saving DataServer stuff in puppet master
+                        string newDataServerURL = "tcp://localhost:" + dataServerPort + "/" + commandProcess;
+                        DataServerInterface dataServerProxy = (DataServerInterface)Activator.GetObject(
+                                                        typeof(DataServerInterface),
+                                                        newDataServerURL);
+
+                        dataServers.Add(commandProcess, new Tuple<string, DataServerInterface>(newDataServerURL, dataServerProxy));
+                    }
+
+                    //call to the DataServer for unfreeze
+                    dataServers[commandProcess].Item2.freeze();
+
+                    LogPrint("Freeze of " + commandProcess + " successful!");
+                }
+
+                return;
+            }
+
             //UNFREEZE COMMAND - (ONLY TO DATASERVERS)
             if (commandType.ToUpper() == "UNFREEZE")
             {
@@ -670,7 +705,6 @@ namespace PuppetMaster
                 return;
             }
 
-            /*Debug only - APAGAR*/
             LogPrint("Command to RUN:" + command);
 
             runCommand(command);
