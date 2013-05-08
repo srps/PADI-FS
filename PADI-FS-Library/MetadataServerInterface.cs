@@ -20,9 +20,10 @@ namespace PADI_FS_Library
 
         //Other Operations
         void registerDataServer(string dataServerName, string dataServerURL);
-        bool IsAlive();
-        bool IsMaster();
-        MetadataServerInformation TakeControl(string metadataServerName);
-        MetadataServerInformation Ping(string metadataServerName);
+        void iWasBorn(string metadataServerName, int metadataServerPort);
+        void sendUpdateInformation(MetadataServerInformation infoToUpdate);
+        void takeControl();
+        void ping();
+        bool isMaster();
     }
 }

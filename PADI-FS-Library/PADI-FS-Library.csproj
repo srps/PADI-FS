@@ -40,11 +40,11 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="MetadataServerInformation.cs" />
     <Compile Include="ClientInterface.cs" />
     <Compile Include="DataServerInterface.cs" />
     <Compile Include="File.cs" />
     <Compile Include="FileMetadata.cs" />
+    <Compile Include="MetadataServerInformation.cs" />
     <Compile Include="MetadataServerInterface.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>

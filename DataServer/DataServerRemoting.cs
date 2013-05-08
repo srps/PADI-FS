@@ -1,4 +1,6 @@
 ﻿using System;
+using System.IO;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -24,7 +26,7 @@ namespace DataServer
         bool _isInFailMode;
 
         //Data about files being created
-        Dictionary<string, File> _filesData;
+        Dictionary<string, PADI_FS_Library.File> _filesData;
 
         public DataServerRemoting(string dataServerName, int dataServerPort)
         {
@@ -35,7 +37,7 @@ namespace DataServer
             _isInFreezeMode = false;
             _isInFailMode = false;
 
-            _filesData = new Dictionary<string, File>();
+            _filesData = new Dictionary<string, PADI_FS_Library.File>();
         }
 
         //Auxiliar Functions
@@ -49,7 +51,7 @@ namespace DataServer
         // Main Operations
 
         // Read Operation
-        public File read(string filename, string semantics) //semantics ... QUAL O USO DISTO????
+        public PADI_FS_Library.File read(string filename, string semantics) //semantics ... QUAL O USO DISTO????
         {
                    
 
@@ -197,7 +199,7 @@ namespace DataServer
         public void createFilename(string filename)
         {
             if(!_filesData.ContainsKey(filename))
-                _filesData.Add(filename, new File(filename, "", 0));
+                _filesData.Add(filename, new PADI_FS_Library.File(filename, "", 0));
 
             /*if (_isInFreezeMode)
             {
@@ -242,6 +244,81 @@ namespace DataServer
                 if (_filesData.ContainsKey(filename))
                     _filesData.Remove(filename);
             }*/
+        }
+
+        public void register()
+        {
+            //Registo do DataServer nos MetadataServers (basta enviar a um, ele expande o registo)
+
+            Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyoneAlive();
+
+            while(aliveMetadataServerMaster == null)
+                aliveMetadataServerMaster = isAnyoneAlive();
+
+            //Someone (MetadataServer) is alive (no matter who - it wont be null)
+            if (aliveMetadataServerMaster != null) //just to check xD
+            {
+                MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
+
+                
+                aliveMetadataServerMasterInterface.registerDataServer(_dataServerName, "tcp://localhost:" + _dataServerPort + "/" + _dataServerName);
+                
+            }           
+        }
+
+        //isAnyoneAlive Operation - gets a random Metadata Server that is alive (master or not)
+        private Tuple<string, MetadataServerInterface> isAnyoneAlive()
+        {
+            TextReader metadataServersPorts; 
+            string metadataServersPortsLine;
+            string[] metadataServersPortsLineWords;
+
+            string metadataServerName = null;
+            string metadataServerPort = null;
+            string metadataServerURL = null;
+
+            LinkedList<Tuple<string, MetadataServerInterface>> metadataServersList = new LinkedList<Tuple<string,MetadataServerInterface>>();
+
+            while (true)
+            {
+                metadataServersPorts = new StreamReader(@"..\..\..\MetadataServer\bin\Debug\MetadataServersPorts.txt");
+
+                metadataServersList = new LinkedList<Tuple<string, MetadataServerInterface>>();
+
+                while ((metadataServersPortsLine = metadataServersPorts.ReadLine()) != null)
+                {
+                    metadataServersPortsLineWords = metadataServersPortsLine.Split(' ');
+                    metadataServerName = metadataServersPortsLineWords[0];
+                    metadataServerPort = metadataServersPortsLineWords[1];
+                    metadataServerURL = "tcp://localhost:" + metadataServerPort + "/" + metadataServerName;
+
+                    MetadataServerInterface metadataServerProxy = (MetadataServerInterface)Activator.GetObject(
+                                                              typeof(MetadataServerInterface),
+                                                              metadataServerURL);
+                    Random random = new Random();
+
+                    if(random.Next(2) < 1)
+                        metadataServersList.AddFirst(new Tuple<string, MetadataServerInterface>(metadataServerName, metadataServerProxy));
+                    else metadataServersList.AddLast(new Tuple<string, MetadataServerInterface>(metadataServerName, metadataServerProxy));
+                }
+                metadataServersPorts.Close();
+
+                foreach (Tuple<string, MetadataServerInterface> metadata in metadataServersList)
+                {
+                    try
+                    {
+                        metadata.Item2.ping();
+
+                        return new Tuple<string, MetadataServerInterface>(metadata.Item1, metadata.Item2);
+                    }
+                    catch (Exception e)
+                    {
+                        LogPrint("NOT ONLINE METADATA WITH NAME " + metadataServerName + " " + e.Message);
+                    }
+                }
+                
+            }
+
         }
     }
 }

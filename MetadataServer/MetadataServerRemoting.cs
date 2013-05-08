@@ -2,13 +2,18 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
-using System.IO;
 
 using PADI_FS_Library;
+
+using System.IO;
 
 namespace MetadataServer
 {
 
+    //For replica syncing
+    public delegate void RemoteAsyncSyncReplicasDelegate(MetadataServerInformation infoToUpdate);
+
+    
     /// <summary>
     /// MetadataServer Remoting Class
     /// </summary>
@@ -20,17 +25,19 @@ namespace MetadataServer
         int _metadataServerPort;
 
         bool _isMaster;
+
         bool _isInFailMode;
 
-        Dictionary<string, bool> _aliveServers;
+        //Metadata Actual Master Proxy
+        MetadataServerInterface _metadataMasterActualProxy;
 
-        // Other Metadata Server URLs
-        Dictionary<string, MetadataServerInterface> _metadataProxies;
+        //MetadataServers Proxys
+        Dictionary<string, MetadataServerInterface> _metadataServersProxys;
 
         //DataServers URLS
         Dictionary<string, string> _dataServersURLS;
-        //DataServers Proxies
-        Dictionary<string, DataServerInterface> _dataServersProxies;
+        //DataServers Proxys
+        Dictionary<string, DataServerInterface> _dataServersProxys;
 
         //Metadata about files being created
         Dictionary<string, FileMetadata> _filesMetadata;
@@ -50,26 +57,25 @@ namespace MetadataServer
         //Association between existing files and number of clients that are using them
         Dictionary<string, int> _numberOfClientsUsingExistingFile; /*Nao esta a ser usado*/
 
-
-        
+        //For file creation
         string _fileUniqueName;
         int _fileUniqueID;
 
-
-
         public MetadataServerRemoting(string metadataServerName, int metadataServerPort)
         {
-
             //Inicializations
             _metadataServerName = metadataServerName;
             _metadataServerPort = metadataServerPort;
 
             _isInFailMode = false;
-            _isMaster = false;
-            bool _seenMaster = false;
+
+            _metadataMasterActualProxy = null;
+
+
+            _metadataServersProxys = new Dictionary<string, MetadataServerInterface>();
 
             _dataServersURLS = new Dictionary<string, string>();
-            _dataServersProxies = new Dictionary<string, DataServerInterface>();
+            _dataServersProxys = new Dictionary<string, DataServerInterface>();
 
             _filesMetadata = new Dictionary<string, FileMetadata>();
 
@@ -81,95 +87,10 @@ namespace MetadataServer
 
 
             _fileUniqueName = "LOCAL-DATASERVER-FILENAME-";
-            _fileUniqueID = 1;
-
-            TextReader metadataServersPorts = new StreamReader(@"..\..\..\Metadata\bin\Debug\MetadataServersPorts.txt");
-            string metadataServersPortsLine;
-            string[] metadataServersPortsLineWords;
-            while ((metadataServersPortsLine = metadataServersPorts.ReadLine()) != null)
-            {
-                metadataServersPortsLineWords = metadataServersPortsLine.Split(' ');
-                string _lineMDServerName = metadataServersPortsLineWords[0];
-                string _lineMDServerPort = metadataServersPortsLineWords[1];
-                string _lineMDServerURL = "tcp://localhost:" + _lineMDServerPort + "/" + _lineMDServerName;
-
-                    MetadataServerInterface metadataServerToAdd = (MetadataServerInterface)Activator.GetObject(
-                                                                  typeof(MetadataServerInterface),
-                                                                  _lineMDServerURL);
-
-                    _metadataProxies.Add(_lineMDServerName, metadataServerToAdd);
-                    try
-                    {
-                        if (_metadataServerName != _lineMDServerName)
-                        {
-                            _aliveServers.Add(_lineMDServerName, metadataServerToAdd.IsAlive());
-                            if(_aliveServers[_lineMDServerName]) {
-                                if(Convert.ToInt32(_lineMDServerName.Split('-')[1]) > Convert.ToInt32(_metadataServerName.Split('-')[1]))
-                                {
-                                    if(metadataServerToAdd.IsMaster()){
-                                        metadataServerToAdd.Ping(_metadataServerName);
-                                        _seenMaster = true;
-                                    }
-                                }
-                                else {
-                                      if(!_seenMaster) {
-                                          _isMaster = true;
-                                          metadataServerToAdd.TakeControl(_metadataServerName);
-                                      }
-                                }
-                            }
-                        }
-                    }
-                    catch (Exception)
-                    {
-                        _aliveServers.Add(_lineMDServerName, false);
-                    }
-            }
+            _fileUniqueID = 1;           
         }
 
         //Auxiliar Functions
-
-
-        public MetadataServerInformation Ping(string _MDServerName)
-        {
-            _aliveServers.Add(_MDServerName, true);
-            return new MetadataServerInformation(_aliveServers,
-                _metadataProxies,
-                _dataServersURLS,
-                _dataServersProxies,
-                _filesMetadata,
-                _dataServersNumberOfFiles,
-                _dataServersAssociatedFilenames,
-                _localFilesDataServers,
-                _filesWithMissingDataServers,
-                _numberOfClientsUsingExistingFile,
-                _fileUniqueID);
-        }
-
-        public MetadataServerInformation TakeControl(string _MDServerName) {
-            _isMaster = false;
-            return new MetadataServerInformation(_aliveServers,
-                _metadataProxies,
-                _dataServersURLS,
-                _dataServersProxies,
-                _filesMetadata,
-                _dataServersNumberOfFiles,
-                _dataServersAssociatedFilenames,
-                _localFilesDataServers,
-                _filesWithMissingDataServers,
-                _numberOfClientsUsingExistingFile,
-                _fileUniqueID);
-        }
-
-        public bool IsMaster()
-        {
-            return _isMaster;
-        }
-
-        public bool IsAlive()
-        {
-            return !_isInFailMode;
-        }
 
         private void LogPrint(string toPrint)
         {
@@ -183,20 +104,19 @@ namespace MetadataServer
             return filenameToReturn;
         }
 
-        /*
-        public bool RemoveFromFilesWithMissingDataServersPredicate(Tuple<string, int> element)
-        {
-            if (element.Item2 == 0)
-                return true;
-            else return false;
-        }*/
-
 
         //Main Operations
 
         //Create Operation
         public FileMetadata create(string filename, int numberOfDataServers, int readQuorum, int writeQuorum)
         {
+
+            if (!_isMaster)
+            {
+                FileMetadata fileToReturn = _metadataMasterActualProxy.create(filename, numberOfDataServers, readQuorum, writeQuorum);
+                return fileToReturn;
+            }
+
             //Verification if the file with this filename already exists, if it does, returns an error
             if (_filesMetadata.ContainsKey(filename))
             {
@@ -221,7 +141,7 @@ namespace MetadataServer
             int counter = 0;
             foreach (string dataServerName in sortedDataServersNumberOfFiles.Keys)
             {
-                _dataServersProxies[dataServerName].createFilename(associatedFilename);
+                _dataServersProxys[dataServerName].createFilename(associatedFilename);
                 _dataServersNumberOfFiles[dataServerName] = _dataServersNumberOfFiles[dataServerName] + 1;
                 _localFilesDataServers[associatedFilename].Add(dataServerName);
 
@@ -243,25 +163,48 @@ namespace MetadataServer
 
             _filesMetadata.Add(filename, newFileMetadata);
 
+
+            //Update replicas
+            if(_isMaster)
+                updateMetadataServerReplicas();
+
             return newFileMetadata;
         }
 
         // Open Operation
         public FileMetadata open(string filename)
         {
+            if (!_isMaster)
+            {
+                FileMetadata openToReturn = _metadataMasterActualProxy.open(filename);
+                return openToReturn;
+            }
+
             return _filesMetadata[filename];
         }
 
         // Close Operation
         public void close(string filename)
         {
+            if (!_isMaster)
+            {
+                _metadataMasterActualProxy.close(filename);
+                return;
+            }
+
             return;
         }
 
         // Delete Operation
         public void delete(string filename)
         {
-            // If filename exists, delete filemetadata stored from filename
+            if (!_isMaster)
+            {
+                _metadataMasterActualProxy.delete(filename);
+                return;
+            }
+
+            // If filename exists, delete filemetada stored from filename
             // Else returns because it doesnt exist
             if (_filesMetadata.ContainsKey(filename))
                 _filesMetadata.Remove(filename);
@@ -284,7 +227,7 @@ namespace MetadataServer
 
                 foreach (string dataServerNameWithFile in dataServersWithFile)
                 {
-                    _dataServersProxies[dataServerNameWithFile].deleteFilename(local_dataserver_filename_associated);
+                    _dataServersProxys[dataServerNameWithFile].deleteFilename(local_dataserver_filename_associated);
                     _dataServersNumberOfFiles[dataServerNameWithFile] = _dataServersNumberOfFiles[dataServerNameWithFile] - 1;
                 }
 
@@ -298,6 +241,10 @@ namespace MetadataServer
                     _filesWithMissingDataServers.Remove(fileWithMissingDataServersName);
                     break;
                 }
+
+            //Update replicas
+            if (_isMaster)
+                updateMetadataServerReplicas();
             
 
         }
@@ -316,11 +263,13 @@ namespace MetadataServer
         }
 
         //Dump Operation
-        //This operation doesnt only prints the files metadata saved in this process, but also sends it, in a text form way, to the
-        //process caller (Puppet Master) for local printing
+        //This operation doesnt only prints if this metadata is the master and the files metadata saved in this process, but also sends it, 
+        //in a text form way, to the process caller (Puppet Master) for local printing
         public string dump()
         {
-            string dumpInfo = "";
+            string dumpInfo = "IS MASTER? " + _isMaster + "\r\n";
+
+            LogPrint(dumpInfo);
 
             int fileNumber = 1;
             string toDump = null;
@@ -340,20 +289,26 @@ namespace MetadataServer
         //RegisterDataServer Operation
         public void registerDataServer(string dataServerName, string dataServerURL)
         {
+            if (!_isMaster)
+            {
+                _metadataMasterActualProxy.registerDataServer(dataServerName, dataServerURL);
+                return;
+            }
+
             DataServerInterface dataServerProxy = (DataServerInterface)Activator.GetObject(
                                             typeof(DataServerInterface),
                                             dataServerURL);
 
             //Saving DataServer stuff in MetaDataServer context
             _dataServersURLS.Add(dataServerName, dataServerURL);
-            _dataServersProxies.Add(dataServerName, dataServerProxy);
+            _dataServersProxys.Add(dataServerName, dataServerProxy);
             _dataServersNumberOfFiles.Add(dataServerName, 0);
 
             //LogPrint("COUNT: " + _filesWithMissingDataServers.Count);
             //for each file with missing data servers, associate this data server
             foreach (string fileWithMissingDataServerName in _filesWithMissingDataServers.Keys)
             {
-                _dataServersProxies[dataServerName].createFilename(_dataServersAssociatedFilenames[fileWithMissingDataServerName]);
+                _dataServersProxys[dataServerName].createFilename(_dataServersAssociatedFilenames[fileWithMissingDataServerName]);
                 _dataServersNumberOfFiles[dataServerName] = _dataServersNumberOfFiles[dataServerName] + 1;
                 _localFilesDataServers[_dataServersAssociatedFilenames[fileWithMissingDataServerName]].Add(dataServerName);
                 _filesMetadata[fileWithMissingDataServerName].FileDataServersLocations.Add(new Tuple<string, string>(dataServerURL, _dataServersAssociatedFilenames[fileWithMissingDataServerName]));
@@ -368,9 +323,162 @@ namespace MetadataServer
             {
                 _filesWithMissingDataServers.Remove(s.Key);
             }
-
-
+            
+            //Update replicas
+            if (_isMaster)
+                updateMetadataServerReplicas();
 
         }
+
+        public void configureMaster()
+        {
+            Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyMasterAlive();
+
+            //Someone is alive (the master)
+            if (aliveMetadataServerMaster != null)
+            {
+                _isMaster = false;
+
+                _metadataMasterActualProxy = aliveMetadataServerMaster.Item2;
+
+                _metadataMasterActualProxy.iWasBorn(_metadataServerName, _metadataServerPort);
+                
+            }
+            else
+            {
+                _isMaster = true;
+
+                _metadataMasterActualProxy = (MetadataServerInterface)Activator.GetObject(typeof(MetadataServerInterface),
+                                                                                          "tcp://localhost:" + _metadataServerPort + "/" + _metadataServerName);
+
+                _metadataServersProxys.Add(_metadataServerName, _metadataMasterActualProxy);
+            }
+        }
+
+
+        private Tuple<string, MetadataServerInterface> isAnyMasterAlive()
+        {
+            TextReader metadataServersPorts = new StreamReader(@"..\..\..\MetadataServer\bin\Debug\MetadataServersPorts.txt");
+            string metadataServersPortsLine;
+            string[] metadataServersPortsLineWords;
+
+            string metadataServerName = null;
+            string metadataServerPort = null;
+            string metadataServerURL = null;
+            while ((metadataServersPortsLine = metadataServersPorts.ReadLine()) != null)
+            {
+                metadataServersPortsLineWords = metadataServersPortsLine.Split(' ');
+                metadataServerName = metadataServersPortsLineWords[0];
+                metadataServerPort = metadataServersPortsLineWords[1];
+                metadataServerURL = "tcp://localhost:" + metadataServerPort + "/" + metadataServerName;
+
+                if (metadataServerName != _metadataServerName)
+                {
+                    try
+                    {
+                        MetadataServerInterface metadataServerProxy = (MetadataServerInterface)Activator.GetObject(
+                                                              typeof(MetadataServerInterface),
+                                                              metadataServerURL);
+                        if (metadataServerProxy.isMaster())
+                        {
+                            metadataServersPorts.Close();
+                            return new Tuple<string, MetadataServerInterface>(metadataServerName, metadataServerProxy);
+                        }
+                        
+                    }
+                    catch (Exception e)
+                    {
+                        LogPrint("NOT ONLINE METADATA WITH NAME " + metadataServerName + " " + e.Message);
+                    }
+                }
+                        
+            }
+            metadataServersPorts.Close();
+
+            return null;
+            
+         }
+
+
+
+        //iWasBorn Operation
+        public void iWasBorn(string metadataServerName, int metadataServerPort)
+        {
+            //Save metadata info
+            string metadataServerURL = "tcp://localhost:" + metadataServerPort + "/" + metadataServerName;
+
+            MetadataServerInterface metadataServerProxy = (MetadataServerInterface)Activator.GetObject(
+                                                              typeof(MetadataServerInterface),
+                                                              metadataServerURL);
+
+            _metadataServersProxys.Add(metadataServerName, metadataServerProxy);
+
+            
+            foreach (string metadataServer in _metadataServersProxys.Keys)
+            {
+                if (metadataServer != _metadataServerName)
+                    _metadataServersProxys[metadataServer].sendUpdateInformation(getMetadataServerInformation());
+            }
+
+        }
+
+        private void updateMetadataServerReplicas()
+        {
+            MetadataServerInformation toSend = getMetadataServerInformation();
+
+            foreach (string metadataServerName in _metadataServersProxys.Keys)
+            {
+                if(metadataServerName != _metadataServerName)
+                    _metadataServersProxys[metadataServerName].sendUpdateInformation(getMetadataServerInformation());
+            }
+
+        }
+
+        //SendUpdateInformation Operation
+        public void sendUpdateInformation(MetadataServerInformation infoToUpdate)
+        {
+            this.updateMetadataServerInformation(infoToUpdate);
+        }
+
+        private MetadataServerInformation getMetadataServerInformation()
+        {
+            return new MetadataServerInformation(null, _metadataServersProxys, _dataServersURLS, _dataServersProxys, _filesMetadata,
+                                                 _dataServersNumberOfFiles, _dataServersAssociatedFilenames, _localFilesDataServers,
+                                                 _filesWithMissingDataServers, _numberOfClientsUsingExistingFile, _fileUniqueID);
+        }
+
+        private void updateMetadataServerInformation(MetadataServerInformation infoToUpdate)
+        {
+            /*Falta o primeiro argumento*/
+            _metadataServersProxys = infoToUpdate.MetadataProxies;            
+            _dataServersURLS = infoToUpdate.DataServersURLS;
+            _dataServersProxys = infoToUpdate.DataServersProxies;
+            _filesMetadata = infoToUpdate.FilesMetadata;
+            _dataServersNumberOfFiles = infoToUpdate.DataServersNumberOfFiles;
+            _dataServersAssociatedFilenames = infoToUpdate.DataServersAssociatedFilenames;
+            _localFilesDataServers = infoToUpdate.LocalFilesDataServers;           
+            _filesWithMissingDataServers = infoToUpdate.FilesWithMissingDataServers;
+            _numberOfClientsUsingExistingFile = infoToUpdate.NumberOfClientsUsingExistingFile;
+            _fileUniqueID = infoToUpdate.FileUniqueID;
+            
+            
+        }
+
+        //takeControl Operation
+        public void takeControl()
+        {
+            _isMaster = true;
+        }
+
+        //ping Operation - to check if a Metadata Server is alive
+        public void ping()
+        {
+        }
+
+        public bool isMaster()
+        {
+            return _isMaster;
+        }
+
     }
 }

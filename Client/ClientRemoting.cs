@@ -39,8 +39,8 @@ namespace Client
         int _writeResponses = 0;
 
 
-        //MetadataServers Proxies
-        Dictionary<string, MetadataServerInterface> _metadataServersProxies;
+        //MetadataServers Proxys
+        Dictionary<string, MetadataServerInterface> _metadataServersProxys;
         //Arrays with 10 positions for storing file Metadata being used
         Tuple<FileMetadata, PADI_FS_Library.File>[] _filesInfo;
         //Arrays with 10 positions for storing files (contents) being used...
@@ -52,7 +52,7 @@ namespace Client
             _clientName = clientName;
             _clientPort = clientPort;
 
-            _metadataServersProxies = new Dictionary<string, MetadataServerInterface>();
+            _metadataServersProxys = new Dictionary<string, MetadataServerInterface>();
             _filesInfo = new Tuple<FileMetadata, PADI_FS_Library.File>[numberOfRegisters];
             _stringRegister = new String[numberOfRegisters];
             for (int i = 0; i < numberOfRegisters; i++)
@@ -61,7 +61,7 @@ namespace Client
                 _stringRegister[i] = "";
             }
 
-            //Populate Metadata Servers Proxies
+            //Populate Metadata Servers Proxys
             TextReader metadataServersPorts = new StreamReader(@"..\..\..\Client\bin\Debug\MetadataServersPorts.txt");
             string metadataServersPortsLine;
             string[] metadataServersPortsLineWords;
@@ -76,7 +76,7 @@ namespace Client
                                                               typeof(MetadataServerInterface),
                                                               metadataServerURL);
 
-                _metadataServersProxies.Add(metadataServerName, metadataServerToAdd);
+                _metadataServersProxys.Add(metadataServerName, metadataServerToAdd);
             }
 
         }
@@ -146,11 +146,11 @@ namespace Client
             FileMetadata fileMetadataToCreate = null;
 
             //If client calls each MetadataServer in order, then if someone awnsers it will be the master/primary
-            foreach(string metadataServerName in _metadataServersProxies.Keys)
+            foreach(string metadataServerName in _metadataServersProxys.Keys)
             {
                 try
                 {
-                    fileMetadataToCreate = _metadataServersProxies[metadataServerName].create(filename, numberOfDataServers, readQuorum, writeQuorum);
+                    fileMetadataToCreate = _metadataServersProxys[metadataServerName].create(filename, numberOfDataServers, readQuorum, writeQuorum);
                     break;
                 }
                 catch (Exception)
@@ -175,11 +175,11 @@ namespace Client
 
             FileMetadata fileMetadataToOpen = null;
 
-            foreach (string metadataServerName in _metadataServersProxies.Keys)
+            foreach (string metadataServerName in _metadataServersProxys.Keys)
             {
                 try
                 {
-                    fileMetadataToOpen = _metadataServersProxies[metadataServerName].open(filename);
+                    fileMetadataToOpen = _metadataServersProxys[metadataServerName].open(filename);
                     break;
                 }
                 catch (Exception)
@@ -202,11 +202,11 @@ namespace Client
             LogPrint("Close Operation");
             LogPrint("\tFile: " + filename);
 
-            foreach (string metadataServerName in _metadataServersProxies.Keys)
+            foreach (string metadataServerName in _metadataServersProxys.Keys)
             {
                 try
                 {
-                    _metadataServersProxies[metadataServerName].close(filename);
+                    _metadataServersProxys[metadataServerName].close(filename);
 
                     for (int i = 0; i < numberOfRegisters; i++)
                     {
@@ -236,11 +236,11 @@ namespace Client
             LogPrint("Delete Operation");
             LogPrint("\tFile: " + filename);
 
-            foreach (string metadataServerName in _metadataServersProxies.Keys)
+            foreach (string metadataServerName in _metadataServersProxys.Keys)
             {
                 try
                 {
-                    _metadataServersProxies[metadataServerName].delete(filename);
+                    _metadataServersProxys[metadataServerName].delete(filename);
 
                     for (int i = 0; i < numberOfRegisters; i++)
                     {
@@ -628,10 +628,6 @@ namespace Client
             fileMetadataToWrite = _filesInfo[destinFileRegister].Item1;
 
 
-            //LogPrint("---------VERSION TO WRITE: " + versionNumberToWrite);
-            //LogPrint("---------POSITION IN FILES CONTENTS FILES META: " + _posOfFilesContentInFilesMetadata[fileRegister]);
-
-
             //Call every Data Server that contains the file
             foreach (Tuple<string, string> fileDataServerLocation in fileMetadataToWrite.FileDataServersLocations)
             {
@@ -790,5 +786,64 @@ namespace Client
 
             }
         }
+
+
+        //Other Operations
+
+        //isAnyoneAlive Operation - gets a random Metadata Server that is alive (master or not)
+        private Tuple<string, MetadataServerInterface> isAnyoneAlive()
+        {
+            TextReader metadataServersPorts;
+            string metadataServersPortsLine;
+            string[] metadataServersPortsLineWords;
+
+            string metadataServerName = null;
+            string metadataServerPort = null;
+            string metadataServerURL = null;
+
+            LinkedList<Tuple<string, MetadataServerInterface>> metadataServersList = new LinkedList<Tuple<string, MetadataServerInterface>>();
+
+            while (true)
+            {
+                metadataServersPorts = new StreamReader(@"..\..\..\MetadataServer\bin\Debug\MetadataServersPorts.txt");
+
+                metadataServersList = new LinkedList<Tuple<string, MetadataServerInterface>>();
+
+                while ((metadataServersPortsLine = metadataServersPorts.ReadLine()) != null)
+                {
+                    metadataServersPortsLineWords = metadataServersPortsLine.Split(' ');
+                    metadataServerName = metadataServersPortsLineWords[0];
+                    metadataServerPort = metadataServersPortsLineWords[1];
+                    metadataServerURL = "tcp://localhost:" + metadataServerPort + "/" + metadataServerName;
+
+                    MetadataServerInterface metadataServerProxy = (MetadataServerInterface)Activator.GetObject(
+                                                              typeof(MetadataServerInterface),
+                                                              metadataServerURL);
+                    Random random = new Random();
+
+                    if (random.Next(2) < 1)
+                        metadataServersList.AddFirst(new Tuple<string, MetadataServerInterface>(metadataServerName, metadataServerProxy));
+                    else metadataServersList.AddLast(new Tuple<string, MetadataServerInterface>(metadataServerName, metadataServerProxy));
+                }
+                metadataServersPorts.Close();
+
+                foreach (Tuple<string, MetadataServerInterface> metadata in metadataServersList)
+                {
+                    try
+                    {
+                        metadata.Item2.ping();
+
+                        return new Tuple<string, MetadataServerInterface>(metadata.Item1, metadata.Item2);
+                    }
+                    catch (Exception e)
+                    {
+                        LogPrint("NOT ONLINE METADATA WITH NAME " + metadataServerName + " " + e.Message);
+                    }
+                }
+
+            }
+
+        }
+
     }
 }

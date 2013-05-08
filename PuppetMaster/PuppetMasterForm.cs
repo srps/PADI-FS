@@ -15,6 +15,7 @@ using System.Windows.Forms;
 using System.Runtime.Remoting;
 using System.Runtime.Remoting.Channels.Tcp;
 using System.Runtime.Remoting.Channels;
+using System.Runtime.Serialization.Formatters;
 using System.Net.Sockets;
 
 
@@ -64,8 +65,15 @@ namespace PuppetMaster
             dump_history_TextBox.Text = "";
             command_TextBox.Text = "";
 
-            channel = new TcpChannel(8400);
+            
+            BinaryServerFormatterSinkProvider provider = new BinaryServerFormatterSinkProvider();
+            provider.TypeFilterLevel = TypeFilterLevel.Full;
+            IDictionary props = new Hashtable();
+            props["port"] = 8400;
+
+            channel = new TcpChannel(props, null, provider);
             ChannelServices.RegisterChannel(channel, true);
+
 
             clients = new Dictionary<string, Tuple<string, ClientInterface>>();
             metadataServers = new Dictionary<string, Tuple<string, MetadataServerInterface>>();

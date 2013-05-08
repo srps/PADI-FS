@@ -8,6 +8,7 @@ namespace PADI_FS_Library
     [Serializable]
     public class MetadataServerInformation
     {
+        //Alive Servers
         private Dictionary<string, bool> _aliveServers;
 
         // Other Metadata Server URLs
@@ -56,6 +57,7 @@ namespace PADI_FS_Library
             _metadataProxies = metadataProxies;
             _dataServersURLS = dataServersURLS;
             _filesMetadata = filesMetadata;
+            _dataServersProxies = dataServersProxies;
             _dataServersNumberOfFiles = dataServersNumberOfFiles;
             _dataServersAssociatedFilenames = dataServersAssociatedFilenames;
             _localFilesDataServers = localFilesDataServers;

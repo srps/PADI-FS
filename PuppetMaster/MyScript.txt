@@ -1,16 +1,30 @@
 ﻿#Script for testing - Nuno
+RECOVER m-2
+DUMP m-2
+RECOVER m-1
+DUMP m-2
+DUMP m-1
 RECOVER m-0
+DUMP m-0
+DUMP m-1
+DUMP m-2
 UNFREEZE d-1
 CREATE c-1, f1, 2, 1, 1
-UNFREEZE d-2
-DUMP d-2
-WRITE c-1, 0, "ESCRITO POR CLIENTE UM"
-CREATE c-2, f2, 2, 1, 1
-WRITE c-2, 0, "ESCRITO POR CLIENTE DOIS"
-FREEZE d-2
-EXESCRIPT c-1 script1.txt
-EXESCRIPT c-2 script2.txt
-UNFREEZE d-2
+DUMP d-1
+DUMP m-0
+DUMP m-1
+DUMP m-2
+#UNFREEZE d-1
+#CREATE c-1, f1, 2, 1, 1
+#UNFREEZE d-2
+#DUMP d-2
+#WRITE c-1, 0, "ESCRITO POR CLIENTE UM"
+#CREATE c-2, f2, 2, 1, 1
+#WRITE c-2, 0, "ESCRITO POR CLIENTE DOIS"
+#FREEZE d-2
+#EXESCRIPT c-1 script1.txt
+#EXESCRIPT c-2 script2.txt
+#UNFREEZE d-2
 #EXESCRIPT c-2 script1.txt
 #READ c-1, 0, monotonic, 0
 #DUMP d-1
