@@ -60,25 +60,6 @@ namespace Client
                 _filesInfo[i] = null;
                 _stringRegister[i] = "";
             }
-
-            //Populate Metadata Servers Proxys
-            TextReader metadataServersPorts = new StreamReader(@"..\..\..\Client\bin\Debug\MetadataServersPorts.txt");
-            string metadataServersPortsLine;
-            string[] metadataServersPortsLineWords;
-            while ((metadataServersPortsLine = metadataServersPorts.ReadLine()) != null)
-            {
-                metadataServersPortsLineWords = metadataServersPortsLine.Split(' ');
-                string metadataServerName = metadataServersPortsLineWords[0];
-                string metadataServerPort = metadataServersPortsLineWords[1];
-                string metadataServerURL = "tcp://localhost:" + metadataServerPort + "/" + metadataServerName;
-
-                MetadataServerInterface metadataServerToAdd = (MetadataServerInterface)Activator.GetObject(
-                                                              typeof(MetadataServerInterface),
-                                                              metadataServerURL);
-
-                _metadataServersProxys.Add(metadataServerName, metadataServerToAdd);
-            }
-
         }
 
         //Auxiliar Functions
@@ -144,19 +125,19 @@ namespace Client
             
 
             FileMetadata fileMetadataToCreate = null;
+           
 
-            //If client calls each MetadataServer in order, then if someone awnsers it will be the master/primary
-            foreach(string metadataServerName in _metadataServersProxys.Keys)
+            Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyoneAlive();
+
+            while(aliveMetadataServerMaster == null)
+                aliveMetadataServerMaster = isAnyoneAlive();
+
+            //Someone (MetadataServer) is alive (no matter who - it wont be null)
+            if (aliveMetadataServerMaster != null) //just to check xD
             {
-                try
-                {
-                    fileMetadataToCreate = _metadataServersProxys[metadataServerName].create(filename, numberOfDataServers, readQuorum, writeQuorum);
-                    break;
-                }
-                catch (Exception)
-                {
-                    Console.WriteLine("Create Operation - Something wrong happened");
-                }
+                MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
+
+                fileMetadataToCreate = aliveMetadataServerMasterInterface.create(filename, numberOfDataServers, readQuorum, writeQuorum);
             }
 
             //Save file metadata created in client side
@@ -175,17 +156,17 @@ namespace Client
 
             FileMetadata fileMetadataToOpen = null;
 
-            foreach (string metadataServerName in _metadataServersProxys.Keys)
+            Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyoneAlive();
+
+            while(aliveMetadataServerMaster == null)
+                aliveMetadataServerMaster = isAnyoneAlive();
+
+            //Someone (MetadataServer) is alive (no matter who - it wont be null)
+            if (aliveMetadataServerMaster != null) //just to check xD
             {
-                try
-                {
-                    fileMetadataToOpen = _metadataServersProxys[metadataServerName].open(filename);
-                    break;
-                }
-                catch (Exception)
-                {
-                    Console.WriteLine("Open Operation - Something wrong happened");
-                }
+                MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
+
+                fileMetadataToOpen = aliveMetadataServerMasterInterface.open(filename);
             }
 
             //Save file metadata created in client side (maybe there will be some changes -> more DataServers associated)
@@ -202,27 +183,26 @@ namespace Client
             LogPrint("Close Operation");
             LogPrint("\tFile: " + filename);
 
-            foreach (string metadataServerName in _metadataServersProxys.Keys)
+            Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyoneAlive();
+
+            while(aliveMetadataServerMaster == null)
+                aliveMetadataServerMaster = isAnyoneAlive();
+
+            //Someone (MetadataServer) is alive (no matter who - it wont be null)
+            if (aliveMetadataServerMaster != null) //just to check xD
             {
-                try
-                {
-                    _metadataServersProxys[metadataServerName].close(filename);
+                MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
 
-                    for (int i = 0; i < numberOfRegisters; i++)
+                aliveMetadataServerMasterInterface.close(filename);
+
+                for (int i = 0; i < numberOfRegisters; i++)
+                {
+                    if (_filesInfo[i].Item1.Filename == filename)
                     {
-                        if (_filesInfo[i].Item1.Filename == filename)
-                        {
-                            _filesInfo[i] = null;
-                            break;
-                        }
+                        _filesInfo[i] = null;
+                        break;
                     }
-
-                    break;
-                }
-                catch (Exception)
-                {
-                    Console.WriteLine("Close Operation - Something wrong happened");
-                }
+                }                
             }
 
             LogPrint("Sucessful!");
@@ -236,25 +216,25 @@ namespace Client
             LogPrint("Delete Operation");
             LogPrint("\tFile: " + filename);
 
-            foreach (string metadataServerName in _metadataServersProxys.Keys)
+
+            Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyoneAlive();
+
+            while(aliveMetadataServerMaster == null)
+                aliveMetadataServerMaster = isAnyoneAlive();
+
+            //Someone (MetadataServer) is alive (no matter who - it wont be null)
+            if (aliveMetadataServerMaster != null) //just to check xD
             {
-                try
-                {
-                    _metadataServersProxys[metadataServerName].delete(filename);
+                MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
 
-                    for (int i = 0; i < numberOfRegisters; i++)
+                aliveMetadataServerMasterInterface.delete(filename);
+
+                for (int i = 0; i < numberOfRegisters; i++)
+                {
+                    if (_filesInfo[i].Item1.Filename == filename)
                     {
-                        if (_filesInfo[i].Item1.Filename == filename)
-                        {
-                            _filesInfo[i] = null;
-                        }
+                        _filesInfo[i] = null;
                     }
-
-                    break;
-                }
-                catch (Exception)
-                {
-                    Console.WriteLine("Delete Operation - Something wrong happened");
                 }
             }
 
@@ -390,10 +370,6 @@ namespace Client
             fileMetadataToWrite = _filesInfo[fileRegister].Item1;
                 
             
-            //LogPrint("---------VERSION TO WRITE: " + versionNumberToWrite);
-            //LogPrint("---------POSITION IN FILES CONTENTS FILES META: " + _posOfFilesContentInFilesMetadata[fileRegister]);
-
-            
             //Call every Data Server that contains the file
             foreach (Tuple<string, string> fileDataServerLocation in fileMetadataToWrite.FileDataServersLocations)
             {
@@ -463,9 +439,6 @@ namespace Client
             }
             fileMetadataToWrite = _filesInfo[fileRegister].Item1;
 
-            //LogPrint("---------VERSION TO WRITE: " + versionNumberToWrite);
-            //LogPrint("---------POSITION IN FILES CONTENTS FILES META: " + _posOfFilesContentInFilesMetadata[fileRegister]);
-
 
             //Call every Data Server that contains the file
             foreach (Tuple<string, string> fileDataServerLocation in fileMetadataToWrite.FileDataServersLocations)
@@ -483,8 +456,6 @@ namespace Client
                 IAsyncResult RemAr = RemoteDel.BeginInvoke(fileDataServerLocation.Item2, versionNumberToWrite, contentToWrite, RemoteCallback, null);
             }
 
-            //LogPrint("WRITE RESPONSES: " + _writeResponses);
-            //LogPrint("WRITE QUORUM: " + fileMetadataToWrite.WriteQuorum);
 
             //Waits for a quorum of Write Responses
             while (_writeResponses < fileMetadataToWrite.WriteQuorum) //ESTA A HAVER PROBLEMAS AQUI ???
@@ -644,8 +615,6 @@ namespace Client
                 IAsyncResult RemAr = RemoteDel.BeginInvoke(fileDataServerLocation.Item2, versionNumberToWrite, contentToWrite, RemoteCallback, null);
             }
 
-            //LogPrint("WRITE RESPONSES: " + _writeResponses);
-            //LogPrint("WRITE QUORUM: " + fileMetadataToWrite.WriteQuorum);
 
             //Waits for a quorum of Write Responses
             while (_writeResponses < fileMetadataToWrite.WriteQuorum) //ESTA A HAVER PROBLEMAS AQUI ???
