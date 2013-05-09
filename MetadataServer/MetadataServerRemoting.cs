@@ -480,5 +480,13 @@ namespace MetadataServer
             return _isMaster;
         }
 
+        //Never allow lease to expire
+        public override object InitializeLifetimeService()
+        {
+
+            return null;
+
+        }
+
     }
 }

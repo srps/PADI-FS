@@ -29,6 +29,7 @@ namespace Client
             provider.TypeFilterLevel = TypeFilterLevel.Full;
             IDictionary props = new Hashtable();
             props["port"] = clientPort;
+            props["timeout"] = 200000;
 
             TcpChannel channel = new TcpChannel(props, null, provider);
             ChannelServices.RegisterChannel(channel, true);

@@ -281,7 +281,7 @@ namespace DataServer
 
             while (true)
             {
-                metadataServersPorts = new StreamReader(@"..\..\..\MetadataServer\bin\Debug\MetadataServersPorts.txt");
+                metadataServersPorts = new StreamReader(@"..\..\..\DataServer\bin\Debug\MetadataServersPorts.txt");
 
                 metadataServersList = new LinkedList<Tuple<string, MetadataServerInterface>>();
 
@@ -313,11 +313,19 @@ namespace DataServer
                     }
                     catch (Exception e)
                     {
-                        LogPrint("NOT ONLINE METADATA WITH NAME " + metadataServerName + " " + e.Message);
+                        LogPrint("NOT ONLINE METADATA WITH NAME " + metadata.Item1 + " " + e.Message);
                     }
                 }
                 
             }
+
+        }
+
+        //Never allow lease to expire
+        public override object InitializeLifetimeService()
+        {
+
+            return null;
 
         }
     }

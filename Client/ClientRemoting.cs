@@ -71,7 +71,7 @@ namespace Client
 
         private void saveFileMetadata(FileMetadata fileMetadata)
         {
-            _filesInfo[_registerPosition] = new Tuple<FileMetadata,PADI_FS_Library.File>(fileMetadata,null);
+            _filesInfo[_registerPosition] = new Tuple<FileMetadata, PADI_FS_Library.File>(fileMetadata,null);
 
             if (++_registerPosition == numberOfRegisters)
                 _registerPosition = 0;
@@ -385,12 +385,9 @@ namespace Client
                 // Call remote method
                 IAsyncResult RemAr = RemoteDel.BeginInvoke(fileDataServerLocation.Item2, versionNumberToWrite, contentToWrite, RemoteCallback, null);
             }
-
-            //LogPrint("WRITE RESPONSES: " + _writeResponses);
-            //LogPrint("WRITE QUORUM: " + fileMetadataToWrite.WriteQuorum);
             
             //Waits for a quorum of Write Responses
-            while (_writeResponses < fileMetadataToWrite.WriteQuorum) //ESTA A HAVER PROBLEMAS AQUI ???
+            while (_writeResponses < fileMetadataToWrite.WriteQuorum)
             {
                 continue;
             }
@@ -650,25 +647,28 @@ namespace Client
             toReturn += "Array File Metadata Registers" + "\r\n";
             foreach (Tuple<FileMetadata, PADI_FS_Library.File> fileInfo in _filesInfo)
             {
-                FileMetadata meta = fileInfo.Item1;
-                PADI_FS_Library.File file = fileInfo.Item2;
-                if (meta != null)
+                if (fileInfo != null)
                 {
-                    string fileMetadataToString = meta.ToString();
-                    LogPrint(fileMetadataToString);
-                    toReturn += fileMetadataToString + "\r\n";
-                } 
-                if (file != null)
-                {
-                    string fileToString = file.ToString();
-                    LogPrint(fileToString);
-                    toReturn += fileToString + "\r\n";
+                    FileMetadata meta = fileInfo.Item1;
+                    PADI_FS_Library.File file = fileInfo.Item2;
+                    if (meta != null)
+                    {
+                        string fileMetadataToString = meta.ToString();
+                        LogPrint(fileMetadataToString);
+                        toReturn += fileMetadataToString + "\r\n";
+                    }
+                    if (file != null)
+                    {
+                        string fileToString = file.ToString();
+                        LogPrint(fileToString);
+                        toReturn += fileToString + "\r\n";
+                    }
                 }
             }
 
             LogPrint("Array File Contents Registers");
             toReturn += "Array File Contents Registers" + "\r\n";
-            foreach (String reg in _stringRegister)
+            foreach (string reg in _stringRegister)
             {
                 if (reg != null)
                 {
@@ -774,7 +774,7 @@ namespace Client
 
             while (true)
             {
-                metadataServersPorts = new StreamReader(@"..\..\..\MetadataServer\bin\Debug\MetadataServersPorts.txt");
+                metadataServersPorts = new StreamReader(@"..\..\..\Client\bin\Debug\MetadataServersPorts.txt");
 
                 metadataServersList = new LinkedList<Tuple<string, MetadataServerInterface>>();
 
@@ -806,11 +806,19 @@ namespace Client
                     }
                     catch (Exception e)
                     {
-                        LogPrint("NOT ONLINE METADATA WITH NAME " + metadataServerName + " " + e.Message);
+                        LogPrint("NOT ONLINE METADATA WITH NAME " + metadata.Item1 + " " + e.Message);
                     }
                 }
 
             }
+
+        }
+
+        //Never allow lease to expire
+        public override object InitializeLifetimeService()
+        {
+
+            return null;
 
         }
 

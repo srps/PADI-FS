@@ -56,6 +56,7 @@ namespace PuppetMaster
 
         TextReader script;
 
+
         public PuppetMasterForm()
         {
             InitializeComponent();
@@ -70,6 +71,7 @@ namespace PuppetMaster
             provider.TypeFilterLevel = TypeFilterLevel.Full;
             IDictionary props = new Hashtable();
             props["port"] = 8400;
+            props["timeout"] = 200000;
 
             channel = new TcpChannel(props, null, provider);
             ChannelServices.RegisterChannel(channel, true);
@@ -728,6 +730,14 @@ namespace PuppetMaster
             LogPrint("----------------------------------------------");
 
             command_TextBox.Text = "";
+        }
+
+        //Never allow lease to expire
+        public override object InitializeLifetimeService()
+        {
+
+            return null;
+
         }
 
         

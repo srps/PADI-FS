@@ -29,6 +29,7 @@ namespace MetadataServer
 	        provider.TypeFilterLevel = TypeFilterLevel.Full;
 	        IDictionary props = new Hashtable();
             props["port"] = metadataServerPort;
+            props["timeout"] = 200000;
 
             TcpChannel channel = new TcpChannel(props, null, provider);
             ChannelServices.RegisterChannel(channel, true);
