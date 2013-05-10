@@ -9,12 +9,12 @@ namespace PADI_FS_Library
     {
         //Main Operations
         File read(string filename, string semantics);
-        void write(string filename, int versionNumber, string contentToWrite);
+        bool write(string filename, int versionNumber, string contentToWrite);
 
         void freeze();
         void unfreeze();
-        /*void fail();
-        void recover();*/
+        void fail();
+        void recover();
 
         string dump();
 

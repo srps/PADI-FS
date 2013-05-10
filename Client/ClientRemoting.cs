@@ -16,7 +16,7 @@ namespace Client
     //Delegate for Read Operation
     public delegate PADI_FS_Library.File RemoteAsyncGetFileDelegate(string filename, string typeOfRead);
     //Delegate for Write Operation
-    public delegate void RemoteAsyncWriteFileDelegate(string filename, int versionNumber, string contentToWrite);
+    public delegate bool RemoteAsyncWriteFileDelegate(string filename, int versionNumber, string contentToWrite);
 
     /// <summary>
     /// Client Remoting Class
@@ -37,6 +37,7 @@ namespace Client
         int _readResponses = 0;
         List<PADI_FS_Library.File> _readFilesResponses = new List<PADI_FS_Library.File>();
         int _writeResponses = 0;
+        bool _writeOperationSucedded = true;
 
 
         //MetadataServers Proxys
@@ -83,13 +84,18 @@ namespace Client
 
             // Alternative 2: Use the callback to get the return value
             RemoteAsyncGetFileDelegate del = (RemoteAsyncGetFileDelegate)((AsyncResult)ar).AsyncDelegate;
+           
             try
             {
                 PADI_FS_Library.File file = del.EndInvoke(ar);
                 _readFilesResponses.Add(file);
                 _readResponses++;
             }
-            catch (Exception)
+            catch (FileDoesntExistException fileDoesntExistException)
+            {
+                LogPrint("File with name " + fileDoesntExistException.Filename + " does not exist in Specified Data Server");
+                _readResponses++;
+            }catch (Exception)
             {
                 LogPrint("Client - Read Operation - Something wrong happened! - maybe file doesnt exist");
             }
@@ -102,14 +108,15 @@ namespace Client
         {
 
             // Alternative 2: Use the callback to get the return value
-            //RemoteAsyncGetFileDelegate del = (RemoteAsyncGetFileDelegate)((AsyncResult)ar).AsyncDelegate;
-            try
-            {
+            RemoteAsyncWriteFileDelegate del = (RemoteAsyncWriteFileDelegate)((AsyncResult)ar).AsyncDelegate;
+            
+            if(del.EndInvoke(ar) == true)
                 _writeResponses++;
-            }
-            catch (Exception)
+            else
             {
-                LogPrint("Client - Write Operation - Something wrong happened! - maybe file doesnt exist");
+                //LogPrint("File with name " + fileDoesntExistException.Filename + " does not exist in Specified Data Server");
+                _writeResponses++;
+                _writeOperationSucedded = false;
             }
 
             return;
@@ -166,7 +173,17 @@ namespace Client
             {
                 MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
 
-                fileMetadataToOpen = aliveMetadataServerMasterInterface.open(filename);
+                try
+                {
+                    fileMetadataToOpen = aliveMetadataServerMasterInterface.open(filename);
+                }
+                catch (FileDoesntExistException fileDoesntExistException)
+                {
+                    LogPrint("File with name " + fileDoesntExistException.Filename + " doesnt exist on metadata side");
+                    LogPrint("Not Sucessful!");
+                    throw new FileDoesntExistException(fileDoesntExistException.Filename);
+                }
+                
             }
 
             //Save file metadata created in client side (maybe there will be some changes -> more DataServers associated)
@@ -197,10 +214,13 @@ namespace Client
 
                 for (int i = 0; i < numberOfRegisters; i++)
                 {
-                    if (_filesInfo[i].Item1.Filename == filename)
+                    if (_filesInfo[i] != null)
                     {
-                        _filesInfo[i] = null;
-                        break;
+                        if (_filesInfo[i].Item1.Filename == filename)
+                        {
+                            _filesInfo[i] = null;
+                            break;
+                        }
                     }
                 }                
             }
@@ -231,10 +251,14 @@ namespace Client
 
                 for (int i = 0; i < numberOfRegisters; i++)
                 {
-                    if (_filesInfo[i].Item1.Filename == filename)
+                    if (_filesInfo[i] != null)
                     {
-                        _filesInfo[i] = null;
+                        if (_filesInfo[i].Item1.Filename == filename)
+                        {
+                            _filesInfo[i] = null;
+                        }
                     }
+                    
                 }
             }
 
@@ -266,6 +290,30 @@ namespace Client
                 fileMetadataToRead = _filesInfo[fileRegister].Item1;
             }
             else throw new Exception("Registo na posicao " + fileRegister + " nao existe");
+
+            //if data servers with this file is smaller than the read quorum do REOPEN
+            while (_filesInfo[fileRegister].Item1.FileDataServersLocations.Count < _filesInfo[fileRegister].Item1.ReadQuorum)
+            {
+                FileMetadata fileMetadataToReopen = null;
+
+                Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyoneAlive();
+
+                while (aliveMetadataServerMaster == null)
+                    aliveMetadataServerMaster = isAnyoneAlive();
+
+                //Someone (MetadataServer) is alive (no matter who - it wont be null)
+                if (aliveMetadataServerMaster != null) //just to check xD
+                {
+                    MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
+
+                    fileMetadataToReopen = aliveMetadataServerMasterInterface.open(_filesInfo[fileRegister].Item1.Filename);
+
+                    _filesInfo[fileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(fileMetadataToReopen, _filesInfo[fileRegister].Item2);
+
+                }
+            }
+
+            fileMetadataToRead = _filesInfo[fileRegister].Item1;
 
             while (_retry > 0)
             {
@@ -312,7 +360,8 @@ namespace Client
                 //fileToSave = null problem (maybe because someone deleted the file in the exact moment this client was going to read it, etc)
                 if (fileToSave == null)
                 {
-                    return "File Doesnt Exist"; // MUDAR PARA EXCEPCAO???
+                    LogPrint("Not Sucessfull!");
+                    throw new FileDoesntExistException(_filesInfo[fileRegister].Item1.Filename);
                 }
                 else
                 {
@@ -347,7 +396,7 @@ namespace Client
             LogPrint("File Read Contents: " + _stringRegister[stringRegister]);
             LogPrint("Sucessful!");
 
-            return _stringRegister[stringRegister];
+            return "" + _filesInfo[fileRegister].Item2.FileContents + " || " + "Version: " + _filesInfo[fileRegister].Item2.VersionNumber;
         }
 
         //Write Operation
@@ -355,6 +404,7 @@ namespace Client
         {
             //Write variables restore
             _writeResponses = 0;
+            _writeOperationSucedded = true;
 
             LogPrint("Write Operation");
             LogPrint("\tFile Register: " + fileRegister + " Contents: " + contentToWrite);
@@ -368,7 +418,31 @@ namespace Client
             if (fileToWrite != null)
                 versionNumberToWrite = fileToWrite.VersionNumber + 1;
             fileMetadataToWrite = _filesInfo[fileRegister].Item1;
-                
+
+
+            //if data servers with this file is smaller than the write quorum do REOPEN
+            while (_filesInfo[fileRegister].Item1.FileDataServersLocations.Count < _filesInfo[fileRegister].Item1.WriteQuorum)
+            {
+                FileMetadata fileMetadataToReopen = null;
+
+                Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyoneAlive();
+
+                while (aliveMetadataServerMaster == null)
+                    aliveMetadataServerMaster = isAnyoneAlive();
+
+                //Someone (MetadataServer) is alive (no matter who - it wont be null)
+                if (aliveMetadataServerMaster != null) //just to check xD
+                {
+                    MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
+
+                    fileMetadataToReopen = aliveMetadataServerMasterInterface.open(_filesInfo[fileRegister].Item1.Filename);
+
+                    _filesInfo[fileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(fileMetadataToReopen, _filesInfo[fileRegister].Item2);
+
+                }
+            }
+
+            fileMetadataToWrite = _filesInfo[fileRegister].Item1;
             
             //Call every Data Server that contains the file
             foreach (Tuple<string, string> fileDataServerLocation in fileMetadataToWrite.FileDataServersLocations)
@@ -391,7 +465,12 @@ namespace Client
             {
                 continue;
             }
-            
+
+            if (_writeOperationSucedded == false)
+            {
+                LogPrint("Not Sucessfull!");
+                throw new FileDoesntExistException(_filesInfo[fileRegister].Item1.Filename);
+            }
 
             //Updates local registers (not really necessary because before any write the client has to make a read)
             //Info: They arent updated if file didnt exist before
@@ -417,6 +496,7 @@ namespace Client
         {
             //Write variables restore
             _writeResponses = 0;
+            _writeOperationSucedded = true;
 
             LogPrint("Write Operation");
             LogPrint("\tFile Register: " + fileRegister + " String Register: " + regPosition);
@@ -436,6 +516,29 @@ namespace Client
             }
             fileMetadataToWrite = _filesInfo[fileRegister].Item1;
 
+            //if data servers with this file is smaller than the write quorum do REOPEN
+            while (_filesInfo[fileRegister].Item1.FileDataServersLocations.Count < _filesInfo[fileRegister].Item1.WriteQuorum)
+            {
+                FileMetadata fileMetadataToReopen = null;
+
+                Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyoneAlive();
+
+                while (aliveMetadataServerMaster == null)
+                    aliveMetadataServerMaster = isAnyoneAlive();
+
+                //Someone (MetadataServer) is alive (no matter who - it wont be null)
+                if (aliveMetadataServerMaster != null) //just to check xD
+                {
+                    MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
+
+                    fileMetadataToReopen = aliveMetadataServerMasterInterface.open(_filesInfo[fileRegister].Item1.Filename);
+
+                    _filesInfo[fileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(fileMetadataToReopen, _filesInfo[fileRegister].Item2);
+
+                }
+            }
+
+            fileMetadataToWrite = _filesInfo[fileRegister].Item1;
 
             //Call every Data Server that contains the file
             foreach (Tuple<string, string> fileDataServerLocation in fileMetadataToWrite.FileDataServersLocations)
@@ -460,6 +563,11 @@ namespace Client
                 continue;
             }
 
+            if (_writeOperationSucedded == false)
+            {
+                LogPrint("Not Sucessfull!");
+                throw new FileDoesntExistException(_filesInfo[fileRegister].Item1.Filename);
+            }
 
             //Updates local registers (not really necessary because before any write the client has to make a read)
             //Info: They arent updated if file didnt exist before
@@ -484,8 +592,8 @@ namespace Client
         {
             string saltString = System.Text.Encoding.Default.GetString(salt);
             LogPrint("Copy Operation");
-            LogPrint("\t Source File Register: " + sourceFileRegister + "Destination File Register: " + destinFileRegister +
-                "Using Semantics: " + semantics + "Salt: " + saltString);
+            LogPrint("\t Source File Register: " + sourceFileRegister + " Destination File Register: " + destinFileRegister +
+                " Semantics: " + semantics + " Salt: " + saltString);
 
             //Read variables restore
             _readResponses = 0;
@@ -505,6 +613,34 @@ namespace Client
                 fileMetadataToRead = _filesInfo[sourceFileRegister].Item1;
             }
             else throw new Exception("Registo na posicao " + sourceFileRegister + " nao existe");
+
+
+            //if data servers with this file is smaller than the read quorum do REOPEN
+            while (_filesInfo[sourceFileRegister].Item1.FileDataServersLocations.Count < _filesInfo[sourceFileRegister].Item1.ReadQuorum)
+            {
+                LogPrint("\t!!!REOPEN FILE!!!");
+
+                FileMetadata fileMetadataToReopen = null;
+
+                Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyoneAlive();
+
+                while (aliveMetadataServerMaster == null)
+                    aliveMetadataServerMaster = isAnyoneAlive();
+
+                //Someone (MetadataServer) is alive (no matter who - it wont be null)
+                if (aliveMetadataServerMaster != null) //just to check xD
+                {
+                    MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
+
+                    fileMetadataToReopen = aliveMetadataServerMasterInterface.open(_filesInfo[sourceFileRegister].Item1.Filename);
+
+                    _filesInfo[sourceFileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(fileMetadataToReopen, _filesInfo[sourceFileRegister].Item2);
+
+                }
+            }
+
+            fileMetadataToRead = _filesInfo[sourceFileRegister].Item1;
+
 
             while (_retry > 0)
             {
@@ -550,7 +686,8 @@ namespace Client
                 //fileToSave = null problem (maybe because someone deleted the file in the exact moment this client was going to read it, etc)
                 if (fileToSave == null)
                 {
-                    return "File Doesnt Exist"; // MUDAR PARA EXCEPCAO???
+                    LogPrint("Not Sucessfull!");
+                    throw new FileDoesntExistException(_filesInfo[sourceFileRegister].Item1.Filename);
                 }
                 else
                 {
@@ -584,6 +721,8 @@ namespace Client
 
             //Write variables restore
             _writeResponses = 0;
+            _writeOperationSucedded = true;
+
 
             PADI_FS_Library.File fileToWrite = _filesInfo[destinFileRegister].Item2;
 
@@ -593,6 +732,31 @@ namespace Client
             FileMetadata fileMetadataToWrite;
             if (fileToWrite != null)
                 versionNumberToWrite = fileToWrite.VersionNumber + 1;
+            fileMetadataToWrite = _filesInfo[destinFileRegister].Item1;
+
+
+            //if data servers with this file is smaller than the write quorum do REOPEN
+            while (_filesInfo[destinFileRegister].Item1.FileDataServersLocations.Count < _filesInfo[destinFileRegister].Item1.WriteQuorum)
+            {
+                FileMetadata fileMetadataToReopen = null;
+
+                Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyoneAlive();
+
+                while (aliveMetadataServerMaster == null)
+                    aliveMetadataServerMaster = isAnyoneAlive();
+
+                //Someone (MetadataServer) is alive (no matter who - it wont be null)
+                if (aliveMetadataServerMaster != null) //just to check xD
+                {
+                    MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
+
+                    fileMetadataToReopen = aliveMetadataServerMasterInterface.open(_filesInfo[destinFileRegister].Item1.Filename);
+
+                    _filesInfo[destinFileRegister] = new Tuple<FileMetadata, PADI_FS_Library.File>(fileMetadataToReopen, _filesInfo[destinFileRegister].Item2);
+
+                }
+            }
+
             fileMetadataToWrite = _filesInfo[destinFileRegister].Item1;
 
 
@@ -619,6 +783,11 @@ namespace Client
                 continue;
             }
 
+            if (_writeOperationSucedded == false)
+            {
+                LogPrint("Not Sucessfull!");
+                throw new FileDoesntExistException(_filesInfo[destinFileRegister].Item1.Filename);
+            }
 
             //Updates local registers (not really necessary because before any write the client has to make a read)
             //Info: They arent updated if file didnt exist before
@@ -633,6 +802,8 @@ namespace Client
                 _filesInfo[destinFileRegister].Item2.FileContents = contentToWrite;
             }
 
+            LogPrint("Sucessful!");
+
             return contentToWrite;
         }
 
@@ -645,8 +816,12 @@ namespace Client
 
             LogPrint("Array File Metadata Registers");
             toReturn += "Array File Metadata Registers" + "\r\n";
+            int counter = 0;
             foreach (Tuple<FileMetadata, PADI_FS_Library.File> fileInfo in _filesInfo)
             {
+                LogPrint("File Metadata Register Number " + counter + ":");
+                toReturn += "File Metadata Register Number " + counter + ":\r\n";
+
                 if (fileInfo != null)
                 {
                     FileMetadata meta = fileInfo.Item1;
@@ -664,17 +839,26 @@ namespace Client
                         toReturn += fileToString + "\r\n";
                     }
                 }
+
+                counter++;
             }
 
+            counter = 0;
             LogPrint("Array File Contents Registers");
             toReturn += "Array File Contents Registers" + "\r\n";
             foreach (string reg in _stringRegister)
             {
+                LogPrint("Array File Contents Register " + counter + ":");
+                toReturn += "Array File Contents Register " + counter + ":\r\n";
+
                 if (reg != null)
                 {
+
                     LogPrint(reg);
                     toReturn += reg + "\r\n";
                 }
+
+                counter++;
             }
 
             LogPrint("Sucessful!");
@@ -706,7 +890,15 @@ namespace Client
 
                 if (commandType.ToUpper() == "OPEN")
                 {
-                    open(commandWords[2]);
+                    try
+                    {
+                        open(commandWords[2]);
+                    }
+                    catch (FileDoesntExistException fileDoesntExistException)
+                    {
+                        LogPrint("File with name " + fileDoesntExistException.Filename + " doesnt exist on metadata side");
+                        LogPrint("Not Sucessful! - EXESCRIPT");
+                    }
                 }
 
                 if (commandType.ToUpper() == "CLOSE")
@@ -721,19 +913,36 @@ namespace Client
 
                 if (commandType.ToUpper() == "READ")
                 {
-                    read(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]));
+                    try
+                    {
+                        read(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]));
+                    }
+                    catch (FileDoesntExistException filedoesntExistException)
+                    {
+                        LogPrint("File for reading with name " + filedoesntExistException.Filename + " doesnt exist in Data Servers context");
+                        LogPrint("Not Sucessful! - EXESCRIPT");
+                    }
+                    
                 }
 
                 if (commandType.ToUpper() == "WRITE")
                 {
                     string textToWrite = null;
 
-                    if (commandToExecute.Contains('\"'))
+                    try
                     {
-                        textToWrite = commandToExecute.Split('\"')[1];
-                        write(Convert.ToInt32(commandWords[2]), textToWrite);
+                        if (commandToExecute.Contains('\"'))
+                        {
+                            textToWrite = commandToExecute.Split('\"')[1];
+                            write(Convert.ToInt32(commandWords[2]), textToWrite);
+                        }
+                        else write(Convert.ToInt32(commandWords[2]), Convert.ToInt32(commandWords[3]));
+                    }catch (FileDoesntExistException filedoesntExistException)
+                    {
+                        LogPrint("File for writting with name " + filedoesntExistException.Filename + " doesnt exist in Data Servers context");
+                        LogPrint("Not Sucessful! - EXESCRIPT");
                     }
-                    else write(Convert.ToInt32(commandWords[2]), Convert.ToInt32(commandWords[3]));
+                    
                 }
 
                 if (commandType.ToUpper() == "COPY")
@@ -744,7 +953,16 @@ namespace Client
                         salt = commandToExecute.Split('\"')[1];
                     }
 
-                    copy(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]), System.Text.Encoding.UTF8.GetBytes(salt));
+                    try
+                    {
+                        copy(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]), System.Text.Encoding.UTF8.GetBytes(salt));
+                    }
+                    catch (FileDoesntExistException filedoesntExistException)
+                    {
+                        LogPrint("File for writting with name " + filedoesntExistException.Filename + " doesnt exist in Data Servers context");
+                        return;
+                    }
+                    
                 }
 
                 if (commandType.ToUpper() == "DUMP")

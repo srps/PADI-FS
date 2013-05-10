@@ -38,6 +38,8 @@
             this.openFileDialog_PADI_FS = new System.Windows.Forms.OpenFileDialog();
             this.run_command = new System.Windows.Forms.Button();
             this.command_TextBox = new System.Windows.Forms.TextBox();
+            this.clear_Pupper_Master_HistoryButton = new System.Windows.Forms.Button();
+            this.clear_Dump_HistoryButton = new System.Windows.Forms.Button();
             this.SuspendLayout();
             // 
             // load_script
@@ -126,11 +128,33 @@
             this.command_TextBox.Size = new System.Drawing.Size(227, 32);
             this.command_TextBox.TabIndex = 8;
             // 
+            // clear_Pupper_Master_HistoryButton
+            // 
+            this.clear_Pupper_Master_HistoryButton.Location = new System.Drawing.Point(362, 28);
+            this.clear_Pupper_Master_HistoryButton.Name = "clear_Pupper_Master_HistoryButton";
+            this.clear_Pupper_Master_HistoryButton.Size = new System.Drawing.Size(71, 20);
+            this.clear_Pupper_Master_HistoryButton.TabIndex = 9;
+            this.clear_Pupper_Master_HistoryButton.Text = "clear";
+            this.clear_Pupper_Master_HistoryButton.UseVisualStyleBackColor = true;
+            this.clear_Pupper_Master_HistoryButton.Click += new System.EventHandler(this.clear_Pupper_Master_HistoryButton_Click);
+            // 
+            // clear_Dump_HistoryButton
+            // 
+            this.clear_Dump_HistoryButton.Location = new System.Drawing.Point(613, 28);
+            this.clear_Dump_HistoryButton.Name = "clear_Dump_HistoryButton";
+            this.clear_Dump_HistoryButton.Size = new System.Drawing.Size(71, 20);
+            this.clear_Dump_HistoryButton.TabIndex = 10;
+            this.clear_Dump_HistoryButton.Text = "clear";
+            this.clear_Dump_HistoryButton.UseVisualStyleBackColor = true;
+            this.clear_Dump_HistoryButton.Click += new System.EventHandler(this.clear_Dump_HistoryButton_Click);
+            // 
             // PuppetMasterForm
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
             this.ClientSize = new System.Drawing.Size(850, 441);
+            this.Controls.Add(this.clear_Dump_HistoryButton);
+            this.Controls.Add(this.clear_Pupper_Master_HistoryButton);
             this.Controls.Add(this.command_TextBox);
             this.Controls.Add(this.run_command);
             this.Controls.Add(this.dump_history_TextBox);
@@ -159,6 +183,8 @@
         private System.Windows.Forms.OpenFileDialog openFileDialog_PADI_FS;
         private System.Windows.Forms.Button run_command;
         private System.Windows.Forms.TextBox command_TextBox;
+        private System.Windows.Forms.Button clear_Pupper_Master_HistoryButton;
+        private System.Windows.Forms.Button clear_Dump_HistoryButton;
     }
 }
 

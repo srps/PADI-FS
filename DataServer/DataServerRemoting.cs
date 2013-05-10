@@ -79,26 +79,31 @@ namespace DataServer
                 {
                     lock (this) { Monitor.Pulse(this); }
 
-                    throw new Exception();
+                    throw new FileDoesntExistException(filename);
                 }
 
             }
             else
             {
-                LogPrint("Read Operation");
-                LogPrint("\t Filename: " + filename + " Semantics: " + semantics);
-
-                //Normal operating
-                if (_filesData.ContainsKey(filename))
+                lock (this)
                 {
-                    LogPrint("Successful!");
+                    LogPrint("Read Operation");
+                    LogPrint("\t Filename: " + filename + " Semantics: " + semantics);
 
-                    return _filesData[filename];
+                    //Normal operating
+                    if (_filesData.ContainsKey(filename))
+                    {
+                        LogPrint("Successful!");
+
+                        return _filesData[filename];
+                    }
+                    else
+                    {
+                        //throw new Exception();
+                        throw new FileDoesntExistException(filename);
+                    }
                 }
-                else
-                {
-                    throw new Exception();
-                }
+                
             }
 
             
@@ -106,7 +111,7 @@ namespace DataServer
         }
 
         //Write Operation
-        public void write(string filename, int versionNumber, string contentToWrite)
+        public bool write(string filename, int versionNumber, string contentToWrite)
         {
 
             if (_isInFreezeMode)
@@ -122,36 +127,46 @@ namespace DataServer
 
                 if (_filesData.ContainsKey(filename))
                 {
-                    _filesData[filename].VersionNumber = versionNumber;
-                    _filesData[filename].FileContents = contentToWrite;
+                    if (_filesData[filename].VersionNumber < versionNumber)
+                    {
+                        _filesData[filename].VersionNumber = versionNumber;
+                        _filesData[filename].FileContents = contentToWrite;
+                    }
+                    
                     lock (this) { Monitor.Pulse(this); }
                 }
                 else
                 {
                     lock (this) { Monitor.Pulse(this); }
-                    throw new Exception();
+                    return false;
                 }
             }
             else
             {
-                LogPrint("Write Operation");
-                LogPrint("\t Filename: " + filename + " Version Number: " + versionNumber + " Contents: " + contentToWrite);
+                lock (this)
+                {
+                    LogPrint("Write Operation");
+                    LogPrint("\t Filename: " + filename + " Version Number: " + versionNumber + " Contents: " + contentToWrite);
 
-                //Normal operating
-                if (_filesData.ContainsKey(filename))
-                {
-                    _filesData[filename].VersionNumber = versionNumber;
-                    _filesData[filename].FileContents = contentToWrite;
-                }
-                else
-                {
-                    throw new Exception();
+                    //Normal operating
+                    if (_filesData.ContainsKey(filename))
+                    {
+                        if (_filesData[filename].VersionNumber < versionNumber)
+                        {
+                            _filesData[filename].VersionNumber = versionNumber;
+                            _filesData[filename].FileContents = contentToWrite;
+                        }
+                    }
+                    else
+                    {
+                        return false;
+                    }
                 }
             }
 
             LogPrint("Successful!");
 
-            return;
+            return true;
         }
 
         //Freeze Operation
@@ -169,11 +184,33 @@ namespace DataServer
             lock (this) { Monitor.Pulse(this); }
         }
 
+        //Fail Operation
+        public void fail()
+        {
+            lock (this)
+            {
+                _isInFailMode = true;
+            }
+            LogPrint("---------------------------FAIL MODE BEGINS------------------------------");
+        }
+
+        //Recover Operation
+        public void recover()
+        {
+            lock (this)
+            {
+                _isInFailMode = false;
+            }            
+            LogPrint("---------------------------FAIL MODE ENDS------------------------------");
+        }
+
         //Dump Operation
         //This operation doesnt only prints the files saved in this process, but also sends it, in a text form way, to the
         //process caller (Puppet Master) for local printing
         public string dump()
         {
+            LogPrint("Dump Operation");
+
             string dumpInfo = "";
 
             int fileNumber = 1;
@@ -188,6 +225,8 @@ namespace DataServer
 
             }
 
+            LogPrint("Sucessfull!");
+
             return dumpInfo;
         }
 
@@ -198,8 +237,16 @@ namespace DataServer
         //Other Operations
         public void createFilename(string filename)
         {
-            if(!_filesData.ContainsKey(filename))
-                _filesData.Add(filename, new PADI_FS_Library.File(filename, "", 0));
+            lock (this)
+            {
+                LogPrint("Create File Operation");
+                LogPrint("\t Filename: " + filename);
+
+                if (!_filesData.ContainsKey(filename))
+                    _filesData.Add(filename, new PADI_FS_Library.File(filename, "", 0));
+
+                LogPrint("Sucessfull!");
+            }            
 
             /*if (_isInFreezeMode)
             {
@@ -223,8 +270,17 @@ namespace DataServer
 
         public void deleteFilename(string filename)
         {
-            if (_filesData.ContainsKey(filename))
-                _filesData.Remove(filename);
+            lock (this)
+            {
+                LogPrint("Delete File Operation");
+                LogPrint("\t Filename: " + filename);
+
+                if (_filesData.ContainsKey(filename))
+                    _filesData.Remove(filename);
+
+                LogPrint("Sucessfull!");
+            }
+            
 
             /*if (_isInFreezeMode)
             {
@@ -252,7 +308,7 @@ namespace DataServer
 
             Tuple<string, MetadataServerInterface> aliveMetadataServerMaster = isAnyoneAlive();
 
-            while(aliveMetadataServerMaster == null)
+            while (aliveMetadataServerMaster == null)
                 aliveMetadataServerMaster = isAnyoneAlive();
 
             //Someone (MetadataServer) is alive (no matter who - it wont be null)
@@ -260,10 +316,10 @@ namespace DataServer
             {
                 MetadataServerInterface aliveMetadataServerMasterInterface = aliveMetadataServerMaster.Item2;
 
-                
+
                 aliveMetadataServerMasterInterface.registerDataServer(_dataServerName, "tcp://localhost:" + _dataServerPort + "/" + _dataServerName);
-                
-            }           
+            }          
+
         }
 
         //isAnyoneAlive Operation - gets a random Metadata Server that is alive (master or not)
@@ -307,7 +363,10 @@ namespace DataServer
                 {
                     try
                     {
+                        
+                        
                         metadata.Item2.ping();
+                        
 
                         return new Tuple<string, MetadataServerInterface>(metadata.Item1, metadata.Item2);
                     }

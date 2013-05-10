@@ -174,7 +174,16 @@ namespace PuppetMaster
                     }
 
                     //call to the client for file opening
-                    FileMetadata fileMetadata = clients[commandProcess].Item2 .open(commandWords[2]);
+                    FileMetadata fileMetadata = null;
+                    try
+                    {
+                        fileMetadata = clients[commandProcess].Item2.open(commandWords[2]);
+                    }
+                    catch (FileDoesntExistException fileDoesntExistException)
+                    {
+                        LogPrint("File with name " + fileDoesntExistException.Filename + " doesnt exist on metadata side");
+                        return;
+                    }
 
                     LogPrint(fileMetadata.ToString());
                 }
@@ -273,7 +282,17 @@ namespace PuppetMaster
                     }
 
                     //call to the client for file reading
-                    string read = clients[commandProcess].Item2.read(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]));
+                    string read = null;
+                    try
+                    {
+                        read = clients[commandProcess].Item2.read(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]));
+                    }
+                    catch (FileDoesntExistException filedoesntExistException)
+                    {
+                        LogPrint("File for reading with name " + filedoesntExistException.Filename + " doesnt exist in Data Servers context");
+                        return;
+                    }
+                    
 
                     LogPrint("File Register contents: " + read);
 
@@ -309,12 +328,22 @@ namespace PuppetMaster
                     }
 
                     //call to the client for file writing
-                    if (command.Contains('\"'))
+                    try
                     {
-                        textToWrite = command.Split('\"')[1];
-                        clients[commandProcess].Item2.write(Convert.ToInt32(commandWords[2]), textToWrite);
-                    } else
-                        clients[commandProcess].Item2.write(Convert.ToInt32(commandWords[2]), Convert.ToInt32(commandWords[3]));
+                        if (command.Contains('\"'))
+                        {
+                            textToWrite = command.Split('\"')[1];
+                            clients[commandProcess].Item2.write(Convert.ToInt32(commandWords[2]), textToWrite);
+                        }
+                        else
+                            clients[commandProcess].Item2.write(Convert.ToInt32(commandWords[2]), Convert.ToInt32(commandWords[3]));
+                    }
+                    catch (FileDoesntExistException filedoesntExistException)
+                    {
+                        LogPrint("File for writting with name " + filedoesntExistException.Filename + " doesnt exist in Data Servers context");
+                        return;
+                    }
+                    
 
                     LogPrint("Writing of file register " + commandWords[2] + " of client " + commandProcess + " sucessful!");
                 }
@@ -323,7 +352,7 @@ namespace PuppetMaster
             }
 
 
-            //WRITE COMMAND - (ONLY TO CLIENTS) 
+            //COPY COMMAND - (ONLY TO CLIENTS) 
             if (commandType.ToUpper() == "COPY")
             {
                 //if its a client 
@@ -353,8 +382,17 @@ namespace PuppetMaster
                     {
                         salt = command.Split('\"')[1];
                     }
+
+                    try
+                    {
+                        clients[commandProcess].Item2.copy(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]), System.Text.Encoding.UTF8.GetBytes(salt));
+                    }
+                    catch (FileDoesntExistException filedoesntExistException)
+                    {
+                        LogPrint("File for writting with name " + filedoesntExistException.Filename + " doesnt exist in Data Servers context");
+                        return;
+                    }
                     
-                    clients[commandProcess].Item2.copy(Convert.ToInt32(commandWords[2]), commandWords[3], Convert.ToInt32(commandWords[4]), System.Text.Encoding.UTF8.GetBytes(salt));
 
                     LogPrint("Copy of file register " + commandWords[2] + " with string " + salt + " to file register " + commandWords[4] + " of client " + commandProcess + " sucessful!");
                 }
@@ -637,6 +675,9 @@ namespace PuppetMaster
         //Loads the local script and opens it for future readings
         private void load_script_Click(object sender, EventArgs e)
         {
+            if(script != null)
+              script.Close();
+
             //Open File Dialog properties
             OpenFileDialog _openFileDialog_PADI_FS = new OpenFileDialog();
             _openFileDialog_PADI_FS.InitialDirectory = @".";
@@ -675,9 +716,13 @@ namespace PuppetMaster
                 //Run command
                 LogPrint("Command to RUN:" + command);
 
+                
                 runCommand(command);
 
-                LogPrint("----------------------------------------------");
+                //System.Threading.Thread.Sleep(3000);
+                
+
+                LogPrint("------------------------------------------------------------------------------------------------------------------");
 
                 
             }
@@ -718,8 +763,8 @@ namespace PuppetMaster
             LogPrint("Command to RUN:" + command);
 
             runCommand(command);
-           
-            LogPrint("----------------------------------------------");
+
+            LogPrint("------------------------------------------------------------------------------------------------------------------");
         }
 
         //Executes one command previously entered in the run_command_TextBox
@@ -727,7 +772,7 @@ namespace PuppetMaster
         {
             LogPrint("Command to RUN:" + command_TextBox.Text);
             runCommand(command_TextBox.Text);
-            LogPrint("----------------------------------------------");
+            LogPrint("------------------------------------------------------------------------------------------------------------------");
 
             command_TextBox.Text = "";
         }
@@ -739,6 +784,17 @@ namespace PuppetMaster
             return null;
 
         }
+
+        private void clear_Pupper_Master_HistoryButton_Click(object sender, EventArgs e)
+        {
+            puppet_master_history_TextBox.Text = "";
+        }
+
+        private void clear_Dump_HistoryButton_Click(object sender, EventArgs e)
+        {
+            dump_history_TextBox.Text = "";
+        }
+
 
         
 
